@@ -36,18 +36,3 @@ export async function deleteAnimal(uid, id) {
   const { fs, ref } = await animalsRef(uid);
   return { done: fs.deleteDoc(fs.doc(ref, id)) };
 }
-
-// Estimate defaults shared by all of the user's devices, at users/{uid}/settings/estimates.
-export async function subscribeSettings(uid, onData, onError) {
-  const { db, fs } = await getFirebase();
-  return fs.onSnapshot(
-    fs.doc(db, 'users', uid, 'settings', 'estimates'),
-    (snap) => onData(snap.data() ?? {}, snap.metadata.fromCache),
-    onError,
-  );
-}
-
-export async function saveSettings(uid, data) {
-  const { db, fs } = await getFirebase();
-  return { done: fs.setDoc(fs.doc(db, 'users', uid, 'settings', 'estimates'), data, { merge: true }) };
-}

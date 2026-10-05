@@ -4,6 +4,7 @@ import {
   adg,
   daysBetween,
   expectedAdg,
+  expectedPricePerKg,
   groupStats,
   latestWeight,
   monthsBetween,
@@ -46,7 +47,7 @@ test('adg is gain over days since purchase', () => {
   assert.equal(adg(animal({ sale: { date: '2026-04-11', weight: 400, price: 1800 } })), 1);
 });
 
-test('expectedAdg falls back in order: own, breed+dam, breed, all, manual', () => {
+test('expectedAdg uses the rate typed for the animal, then own, breed+dam, breed, all', () => {
   const sold = (id, breed, damBreed, weight) =>
     animal({ id, breed, damBreed, sale: { date: '2026-04-11', weight, price: 1800 } }); // 100 days
   const herd = [
@@ -71,8 +72,19 @@ test('expectedAdg falls back in order: own, breed+dam, breed, all, manual', () =
   assert.equal(byAll.source, 'all');
   assert.ok(Math.abs(byAll.value - 1.0) < 1e-9);
 
-  assert.deepEqual(expectedAdg(animal(), [], 0.95), { value: 0.95, source: 'manual' });
   assert.deepEqual(expectedAdg(animal(), []), { value: null, source: null });
+
+  // A typed rate applies to that animal only, ahead of its own history.
+  assert.deepEqual(expectedAdg(animal({ estAdg: 0.95 }), herd), { value: 0.95, source: 'manual' });
+  assert.deepEqual(expectedAdg({ ...own, estAdg: 0.95 }, herd), { value: 0.95, source: 'manual' });
+  assert.equal(expectedAdg(animal({ estAdg: null }), herd).source, 'breed-dam');
+});
+
+test('expectedPricePerKg prefers the price typed for the animal over recent sales', () => {
+  const herd = [animal({ id: 's1', sale: { date: '2026-04-11', weight: 400, price: 1600 } })];
+  assert.equal(expectedPricePerKg(animal({ estPrice: 3.5 }), herd), 3.5);
+  assert.equal(expectedPricePerKg(animal(), herd), 4);
+  assert.equal(expectedPricePerKg(animal(), []), null);
 });
 
 test('projectedWeight grows from the last known weight', () => {

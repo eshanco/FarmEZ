@@ -1,10 +1,9 @@
 import {
-  adg, daysBetween, expectedAdg, latestWeight, monthsBetween, projectedWeight, recentPricePerKg, saleStats,
+  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleStats,
 } from '../calc.js';
 import { breedName } from '../breeds.js';
 import { deleteAnimal, updateAnimal } from '../db.js';
 import { priceTableHtml } from './calculator.js';
-import { getSetting, setSetting } from '../settings.js';
 import {
   esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
@@ -12,6 +11,8 @@ import {
 // Interim weigh-ins are switched off while there is no scale on the farm. Set to true to bring
 // back the Weights section; the calculations already use any weigh-ins an animal has.
 const WEIGH_INS_ENABLED = false;
+
+const SAVE_DELAY = 800;
 
 // What the user has typed into the estimate panel, kept across re-renders of the same animal.
 let est = { id: null, date: '', adg: '', price: '' };
@@ -23,7 +24,7 @@ const SOURCE_TEXT = {
   'breed-dam': (a, n) => `Gain rate is the average of ${n} sold ${a.breed} × ${a.damBreed}.`,
   breed: (a, n) => `Gain rate is the average of ${n} sold ${a.breed}.`,
   all: (a, n) => `Gain rate is the average of all ${n} sold animals.`,
-  manual: () => 'Gain rate is your saved default.',
+  manual: () => 'Gain rate is the figure you entered.',
 };
 
 export function renderAnimal(el, { state, arg }) {
@@ -158,7 +159,7 @@ export function renderAnimal(el, { state, arg }) {
   });
 
   if (!sold) {
-    wireEstimate(el, animal, state.animals, last, today);
+    wireEstimate(el, animal, state.animals, uid, today);
     wireSaleGauge(el, animal, saleForm);
   }
 }
@@ -209,7 +210,7 @@ function onFarmSections(animal, last, today) {
 
     <section class="card">
       <h2>Sale estimate</h2>
-      <div class="inline-form">
+      <div class="inline-form" data-live-save>
         <label>Sale date
           <input id="est-date" type="date" min="${esc(last.date)}">
         </label>
@@ -224,14 +225,27 @@ function onFarmSections(animal, last, today) {
     </section>`;
 }
 
-function wireEstimate(el, animal, animals, last, today) {
+function wireEstimate(el, animal, animals, uid, today) {
   const dateEl = el.querySelector('#est-date');
   const adgEl = el.querySelector('#est-adg');
   const priceEl = el.querySelector('#est-price');
   const out = el.querySelector('#est-out');
 
-  const expected = expectedAdg(animal, animals, getSetting('manualAdg'));
-  const defaultPrice = getSetting('pricePerKg') ?? recentPricePerKg(animals);
+  const expected = expectedAdg(animal, animals);
+  const defaultPrice = expectedPricePerKg(animal, animals);
+
+  // The gain and €/kg typed here belong to this animal only. They are typed a key at a time,
+  // so the save waits for a pause.
+  const unsaved = {};
+  let saveTimer;
+  const saveSoon = (field, value) => {
+    unsaved[field] = value;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      updateAnimal(uid, animal.id, { ...unsaved }).then(({ done }) => reportWrite(done));
+      for (const key of Object.keys(unsaved)) delete unsaved[key];
+    }, SAVE_DELAY);
+  };
 
   // An animal lined up on the Selling tab is estimated for its sale date.
   const planned = animal.sellingDate && animal.sellingDate >= today ? animal.sellingDate : today;
@@ -250,9 +264,7 @@ function wireEstimate(el, animal, animals, last, today) {
     }
     const weight = projectedWeight(animal, rate, date);
     const value = price !== null ? weight * price : null;
-    const source = est.adg
-      ? 'Gain rate is the figure you entered.'
-      : SOURCE_TEXT[expected.source]?.(animal, expected.count) ?? '';
+    const source = est.adg ? SOURCE_TEXT.manual() : SOURCE_TEXT[expected.source]?.(animal, expected.count) ?? '';
 
     out.innerHTML = `
       <div class="tiles">
@@ -270,13 +282,12 @@ function wireEstimate(el, animal, animals, last, today) {
   });
   adgEl.addEventListener('input', () => {
     est.adg = adgEl.value;
-    // With no history to draw on, the typed rate becomes the default for other animals too.
-    if (expected.source === null || expected.source === 'manual') setSetting('manualAdg', positive(adgEl.value));
+    saveSoon('estAdg', positive(adgEl.value));
     update();
   });
   priceEl.addEventListener('input', () => {
     est.price = priceEl.value;
-    setSetting('pricePerKg', positive(priceEl.value));
+    saveSoon('estPrice', positive(priceEl.value));
     update();
   });
   update();

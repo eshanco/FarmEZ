@@ -41,10 +41,11 @@ For an animal still on the farm, the gain rate used for projections is the first
 1. the animal's own gain, once it has a weigh-in at least 30 days after purchase (interim weigh-ins are switched off for now; see `WEIGH_INS_ENABLED` in `js/views/animal.js`);
 2. the average of sold animals with the same breed and dam breed;
 3. the average of sold animals with the same breed;
-4. the average of all sold animals;
-5. a figure you type in.
+4. the average of all sold animals.
 
-**Projected weight** is the last known weight plus that rate for each day since. **Estimated sale price** is projected weight × €/kg, where €/kg defaults to the average of your last five sales and can be changed on any animal. The €/kg and gain rate you type are saved to your account, so every device you sign in on shows the same estimates.
+A gain rate you type on an animal's estimate replaces these for that animal only.
+
+**Projected weight** is the last known weight plus that rate for each day since. **Estimated sale price** is projected weight × €/kg, where €/kg defaults to the average of your last five sales. The €/kg and gain rate you type on an animal are saved on that animal, so they differ from one animal to the next and show on every device you sign in on.
 
 ## Development
 

@@ -49,8 +49,11 @@ export function adg(animal) {
 }
 
 // Gain rate to use when projecting an unsold animal. Returns { value, source } where source is
-// 'own' | 'breed-dam' | 'breed' | 'all' | 'manual' | null.
-export function expectedAdg(animal, animals, manualAdg = null) {
+// 'manual' | 'own' | 'breed-dam' | 'breed' | 'all' | null. A rate typed for this animal
+// (estAdg) comes first.
+export function expectedAdg(animal, animals) {
+  if (animal.estAdg > 0) return { value: animal.estAdg, source: 'manual' };
+
   const last = latestWeight(animal);
   if (daysBetween(animal.purchaseDate, last.date) >= MIN_OWN_ADG_DAYS) {
     return { value: adg(animal), source: 'own' };
@@ -72,7 +75,6 @@ export function expectedAdg(animal, animals, manualAdg = null) {
     if (matches.length) return { value: mean(matches.map((x) => x.gain)), source, count: matches.length };
   }
 
-  if (manualAdg !== null && manualAdg !== undefined) return { value: manualAdg, source: 'manual' };
   return { value: null, source: null };
 }
 
@@ -90,6 +92,11 @@ export function recentPricePerKg(animals, count = 5) {
     .sort((a, b) => (a.sale.date < b.sale.date ? 1 : -1))
     .slice(0, count);
   return mean(sold.map((a) => a.sale.price / a.sale.weight));
+}
+
+// €/kg to value an unsold animal at: the price typed for it (estPrice), else recent sales.
+export function expectedPricePerKg(animal, animals) {
+  return animal.estPrice > 0 ? animal.estPrice : recentPricePerKg(animals);
 }
 
 // Rows of { pricePerKg, total } for a weight. Worked in cents so 0.20 steps do not drift.

@@ -1,7 +1,8 @@
-import { adg, daysBetween, expectedAdg, latestWeight, projectedWeight, recentPricePerKg, saleStats } from '../calc.js';
+import {
+  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, projectedWeight, saleStats,
+} from '../calc.js';
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
-import { getSetting } from '../settings.js';
 import {
   esc, fmtAdg, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
@@ -63,17 +64,23 @@ function matches(a) {
   return !q || `${a.tag} ${a.breed} ${a.damBreed} ${breedName(a.breed)} ${breedName(a.damBreed)}`.toLowerCase().includes(q);
 }
 
+// Each animal is valued at its own €/kg, so totals only cover the animals that have one.
+function pricedSummary(rows, text) {
+  const priced = rows.filter((r) => r.value !== null).length;
+  if (!priced) return 'Enter a €/kg on an animal to see its estimated value.';
+  return priced < rows.length ? `${text} for the ${priced} of ${rows.length} with a €/kg` : text;
+}
+
 function farmList(onFarm, all) {
   if (!onFarm.length) {
     return `<p class="empty">No animals on the farm yet. <a href="#new">Add the first one</a>.</p>`;
   }
   const today = todayISO();
-  const price = getSetting('pricePerKg') ?? recentPricePerKg(all);
-  const manualAdg = getSetting('manualAdg');
 
   const rows = onFarm
     .map((a) => {
-      const exp = expectedAdg(a, all, manualAdg);
+      const exp = expectedAdg(a, all);
+      const price = expectedPricePerKg(a, all);
       const weight = exp.value !== null ? projectedWeight(a, exp.value, today) : latestWeight(a).kg;
       return { a, exp, weight, value: price !== null ? weight * price : null };
     })
@@ -82,9 +89,7 @@ function farmList(onFarm, all) {
   if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
 
   const total = rows.reduce((sum, r) => sum + (r.value ?? 0), 0);
-  const summary = price !== null
-    ? `Estimated herd value today <strong>${fmtMoney(total)}</strong> at ${fmtPrice(price)}/kg`
-    : 'Enter a €/kg on any animal to see estimated values.';
+  const summary = pricedSummary(rows, `Estimated herd value today <strong>${fmtMoney(total)}</strong>`);
 
   return `
     <p class="summary">${summary}</p>
@@ -186,11 +191,10 @@ function sellingRows(selling, all, date) {
   if (!selling.length) {
     return `<p class="empty">No animals lined up for sale. Press <strong>Add from herd</strong> to pick the ones you are selling.</p>`;
   }
-  const price = getSetting('pricePerKg') ?? recentPricePerKg(all);
-  const manualAdg = getSetting('manualAdg');
   const rows = selling
     .map((a) => {
-      const exp = expectedAdg(a, all, manualAdg);
+      const exp = expectedAdg(a, all);
+      const price = expectedPricePerKg(a, all);
       const weight = exp.value !== null ? projectedWeight(a, exp.value, date) : latestWeight(a).kg;
       const value = price !== null ? weight * price : null;
       return { a, weight, value, margin: value !== null ? value - a.cost : null };
@@ -200,9 +204,10 @@ function sellingRows(selling, all, date) {
   if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
 
   const sum = (key) => rows.reduce((total, r) => total + (r[key] ?? 0), 0);
-  const summary = price !== null
-    ? `${rows.length} to sell on ${fmtDate(date)}: estimated value <strong>${fmtMoney(sum('value'))}</strong>, margin <strong>${fmtMoney(sum('margin'))}</strong> at ${fmtPrice(price)}/kg`
-    : 'Enter a €/kg on any animal to see estimated values.';
+  const summary = pricedSummary(
+    rows,
+    `${rows.length} to sell on ${fmtDate(date)}: estimated value <strong>${fmtMoney(sum('value'))}</strong>, margin <strong>${fmtMoney(sum('margin'))}</strong>`,
+  );
 
   return `
     <p class="summary">${summary}</p>
