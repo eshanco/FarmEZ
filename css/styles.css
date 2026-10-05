@@ -239,6 +239,34 @@ input, select {
 
 .sort-select { margin-bottom: 16px; }
 
+.selling-bar { display: grid; gap: 12px; margin-bottom: 16px; }
+
+dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: 85vh;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+dialog::backdrop { background: rgb(0 0 0 / 0.5); }
+dialog .actions { margin-top: 12px; }
+
+.pick-list { max-height: 50vh; overflow-y: auto; margin-top: 12px; }
+label.pick {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+label.pick input { flex: none; width: 22px; height: 22px; min-height: 0; padding: 0; accent-color: var(--accent); }
+
 /* ---------- Figures ---------- */
 
 .tiles {
@@ -323,6 +351,10 @@ th[aria-sort] button::after { content: " ▾"; }
   /* Whole card is the tap target. */
   table.cards .row-link { text-decoration: none; }
   table.cards .row-link::after { content: ""; position: absolute; inset: 0; }
+  /* Buttons inside a card stay clickable above the card-wide link. */
+  table.cards td.row-action { justify-content: flex-end; padding-top: 8px; }
+  table.cards td.row-action .btn { position: relative; z-index: 1; }
+  .tabs button { font-size: 0.9rem; }
 }
 
 .two-col { display: grid; gap: 16px; }
@@ -388,6 +420,7 @@ th[aria-sort] button::after { content: " ▾"; }
   .facts { grid-template-columns: repeat(3, 1fr); }
   .two-col { grid-template-columns: 1fr 1fr; gap: 32px; }
   .sort-select { display: none; }
+  .selling-bar { grid-template-columns: 200px auto; justify-content: start; align-items: end; }
 
   table.cards {
     background: var(--surface);

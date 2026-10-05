@@ -43,7 +43,7 @@ export function renderAnimal(el, { state, arg }) {
   el.innerHTML = `
     <a class="back" href="#herd">‹ Herd</a>
     <div class="page-head">
-      <h1>${esc(animal.tag)} <span class="badge ${sold ? 'sold' : ''}">${sold ? 'Sold' : 'On farm'}</span></h1>
+      <h1>${esc(animal.tag)} <span class="badge ${sold ? 'sold' : ''}">${sold ? 'Sold' : animal.sellingDate ? 'Selling' : 'On farm'}</span></h1>
       <div class="actions">
         ${sold ? '' : '<button class="btn primary" type="button" id="go-sell">Sell</button>'}
         <a class="btn" href="#edit/${esc(animal.id)}">Edit</a>
@@ -154,7 +154,7 @@ export function renderAnimal(el, { state, arg }) {
     else if (f.date > today) error = 'Sale date cannot be in the future.';
     showError(saleForm, error);
     if (error) return;
-    write({ sale: { date: f.date, weight, price } });
+    write({ sale: { date: f.date, weight, price }, sellingDate: null });
   });
 
   if (!sold) {
@@ -233,7 +233,9 @@ function wireEstimate(el, animal, animals, last, today) {
   const expected = expectedAdg(animal, animals, getSetting('manualAdg'));
   const defaultPrice = getSetting('pricePerKg') ?? recentPricePerKg(animals);
 
-  dateEl.value = est.date || today;
+  // An animal lined up on the Selling tab is estimated for its sale date.
+  const planned = animal.sellingDate && animal.sellingDate >= today ? animal.sellingDate : today;
+  dateEl.value = est.date || planned;
   adgEl.value = est.adg || (expected.value !== null ? expected.value.toFixed(2) : '');
   priceEl.value = est.price || (defaultPrice !== null ? defaultPrice.toFixed(2) : '');
 

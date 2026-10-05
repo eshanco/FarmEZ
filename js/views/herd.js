@@ -7,11 +7,19 @@ import {
 
 let tab = 'farm';
 let query = '';
+// Sale date chosen on the Selling tab this session; '' means not chosen yet.
+let sellDate = '';
+let sellDateTimer;
+
+// An animal is lined up for sale when it carries a sellingDate and has not been sold.
+const isSelling = (a) => !a.sale && Boolean(a.sellingDate);
+const byTag = (x, y) => x.tag.localeCompare(y.tag, undefined, { numeric: true });
 
 const breedLabel = (a) => (a.damBreed ? `${a.breed} × ${a.damBreed}` : a.breed);
 
 export function renderHerd(el, { state }) {
   const onFarm = state.animals.filter((a) => !a.sale);
+  const selling = onFarm.filter(isSelling);
   const sold = state.animals.filter((a) => a.sale);
 
   el.innerHTML = `
@@ -22,6 +30,7 @@ export function renderHerd(el, { state }) {
     <div class="toolbar">
       <div class="tabs">
         <button type="button" data-tab="farm" aria-pressed="${tab === 'farm'}">On farm (${onFarm.length})</button>
+        <button type="button" data-tab="selling" aria-pressed="${tab === 'selling'}">Selling (${selling.length})</button>
         <button type="button" data-tab="sold" aria-pressed="${tab === 'sold'}">Sold (${sold.length})</button>
       </div>
       <input type="search" id="herd-search" placeholder="Search tag or breed" aria-label="Search tag or breed" value="${esc(query)}">
@@ -30,7 +39,8 @@ export function renderHerd(el, { state }) {
 
   const list = el.querySelector('#herd-list');
   const draw = () => {
-    list.innerHTML = tab === 'farm' ? farmList(onFarm, state.animals) : soldList(sold);
+    if (tab === 'selling') renderSelling(list, state, onFarm, selling);
+    else list.innerHTML = tab === 'farm' ? farmList(onFarm, state.animals) : soldList(sold);
   };
   draw();
 
@@ -66,7 +76,7 @@ function farmList(onFarm, all) {
       const weight = exp.value !== null ? projectedWeight(a, exp.value, today) : latestWeight(a).kg;
       return { a, exp, weight, value: price !== null ? weight * price : null };
     })
-    .sort((x, y) => x.a.tag.localeCompare(y.a.tag, undefined, { numeric: true }));
+    .sort((x, y) => byTag(x.a, y.a));
   const shown = rows.filter((r) => matches(r.a));
   if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
 
@@ -85,13 +95,130 @@ function farmList(onFarm, all) {
       <tbody>
         ${shown.map(({ a, exp, weight, value }) => `
           <tr>
-            <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
+            <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a>${isSelling(a) ? ' <span class="badge">Selling</span>' : ''}</td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
             <td class="num" data-label="Days on farm">${fmtInt(daysBetween(a.purchaseDate, today))}</td>
             <td class="num" data-label="Last weight">${fmtKg(latestWeight(a).kg)}</td>
             <td class="num" data-label="Gain">${fmtAdg(exp.value)}${exp.value !== null && exp.source !== 'own' ? ' <span class="muted">est.</span>' : ''}</td>
             <td class="num" data-label="Est. weight today">${fmtKg(weight)}</td>
             <td class="num" data-label="Est. value">${fmtMoney(value)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// Animals lined up for the next sale, with estimates for the chosen sale date.
+function renderSelling(list, state, onFarm, selling) {
+  const today = todayISO();
+  const uid = state.user.uid;
+  // The date is saved on each selling animal, so it carries over to another device.
+  const saved = selling.map((a) => a.sellingDate).sort().at(-1);
+  const startDate = sellDate || (saved && saved >= today ? saved : today);
+  const candidates = onFarm.filter((a) => !isSelling(a)).sort(byTag);
+
+  list.innerHTML = `
+    <div class="selling-bar">
+      <label>Sale date
+        <input type="date" id="sell-date" min="${today}" value="${startDate}">
+      </label>
+      <button class="btn" type="button" id="pick-open">Add from herd</button>
+    </div>
+    <div id="selling-rows"></div>
+    <dialog id="picker" aria-labelledby="picker-title">
+      <h2 id="picker-title">Add animals to sell</h2>
+      ${candidates.length ? `
+      <input type="search" id="pick-filter" placeholder="Filter by tag or breed" aria-label="Filter by tag or breed">
+      <div class="pick-list">
+        ${candidates.map((a) => `
+          <label class="pick" data-text="${esc(`${a.tag} ${a.breed} ${a.damBreed}`.toLowerCase())}">
+            <input type="checkbox" value="${esc(a.id)}">
+            <span><strong>${esc(a.tag)}</strong> <span class="muted">${esc(breedLabel(a))}</span></span>
+          </label>`).join('')}
+      </div>` : '<p class="hint">Every animal on the farm is already in the selling list.</p>'}
+      <div class="actions">
+        ${candidates.length ? '<button class="btn primary" type="button" id="pick-add">Add selected</button>' : ''}
+        <button class="btn" type="button" id="pick-cancel">Cancel</button>
+      </div>
+    </dialog>`;
+
+  const dateEl = list.querySelector('#sell-date');
+  const rowsEl = list.querySelector('#selling-rows');
+  const picker = list.querySelector('#picker');
+  const saleDate = () => dateEl.value || today;
+  const save = async (id, data) => reportWrite((await updateAnimal(uid, id, data)).done);
+
+  const drawRows = () => {
+    rowsEl.innerHTML = sellingRows(selling, state.animals, saleDate());
+    rowsEl.querySelectorAll('[data-unsell]').forEach((btn) =>
+      btn.addEventListener('click', () => save(btn.dataset.unsell, { sellingDate: null })),
+    );
+  };
+  drawRows();
+
+  dateEl.addEventListener('change', () => {
+    sellDate = dateEl.value;
+    drawRows();
+    // Saved after a pause so the page is not redrawn while the date is still being typed.
+    clearTimeout(sellDateTimer);
+    const date = saleDate();
+    sellDateTimer = setTimeout(() => {
+      selling.filter((a) => a.sellingDate !== date).forEach((a) => save(a.id, { sellingDate: date }));
+    }, 1000);
+  });
+
+  list.querySelector('#pick-open').addEventListener('click', () => picker.showModal());
+  list.querySelector('#pick-cancel').addEventListener('click', () => picker.close());
+  list.querySelector('#pick-filter')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    picker.querySelectorAll('.pick').forEach((row) => {
+      row.hidden = Boolean(q) && !row.dataset.text.includes(q);
+    });
+  });
+  list.querySelector('#pick-add')?.addEventListener('click', () => {
+    const ids = [...picker.querySelectorAll('.pick input:checked')].map((box) => box.value);
+    picker.close();
+    ids.forEach((id) => save(id, { sellingDate: saleDate() }));
+  });
+}
+
+function sellingRows(selling, all, date) {
+  if (!selling.length) {
+    return `<p class="empty">No animals lined up for sale. Press <strong>Add from herd</strong> to pick the ones you are selling.</p>`;
+  }
+  const price = getSetting('pricePerKg') ?? recentPricePerKg(all);
+  const manualAdg = getSetting('manualAdg');
+  const rows = selling
+    .map((a) => {
+      const exp = expectedAdg(a, all, manualAdg);
+      const weight = exp.value !== null ? projectedWeight(a, exp.value, date) : latestWeight(a).kg;
+      const value = price !== null ? weight * price : null;
+      return { a, weight, value, margin: value !== null ? value - a.cost : null };
+    })
+    .sort((x, y) => byTag(x.a, y.a));
+  const shown = rows.filter((r) => matches(r.a));
+  if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
+
+  const sum = (key) => rows.reduce((total, r) => total + (r[key] ?? 0), 0);
+  const summary = price !== null
+    ? `${rows.length} to sell on ${fmtDate(date)}: estimated value <strong>${fmtMoney(sum('value'))}</strong>, margin <strong>${fmtMoney(sum('margin'))}</strong> at ${fmtPrice(price)}/kg`
+    : 'Enter a €/kg on any animal to see estimated values.';
+
+  return `
+    <p class="summary">${summary}</p>
+    <table class="cards">
+      <thead><tr>
+        <th>Tag</th><th>Breed</th><th class="num">Est. weight</th>
+        <th class="num">Est. value</th><th class="num">Est. margin</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${shown.map(({ a, weight, value, margin }) => `
+          <tr>
+            <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
+            <td data-label="Breed">${esc(breedLabel(a))}</td>
+            <td class="num" data-label="Est. weight">${fmtKg(weight)}</td>
+            <td class="num" data-label="Est. value">${fmtMoney(value)}</td>
+            <td class="num ${margin !== null && margin < 0 ? 'neg' : ''}" data-label="Est. margin">${fmtMoney(margin)}</td>
+            <td class="num row-action"><button class="btn small" type="button" data-unsell="${esc(a.id)}" aria-label="Remove ${esc(a.tag)} from selling">Remove</button></td>
           </tr>`).join('')}
       </tbody>
     </table>`;
