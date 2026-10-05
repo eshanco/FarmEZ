@@ -1,13 +1,9 @@
 import { adg, daysBetween, expectedAdg, latestWeight, projectedWeight, recentPricePerKg, saleStats } from '../calc.js';
+import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
 import {
   esc, fmtAdg, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, getSetting, positive, reportWrite, showError, todayISO,
 } from '../util.js';
-
-const COMMON_BREEDS = [
-  'Aberdeen Angus', 'Aubrac', 'Belgian Blue', "Blonde d'Aquitaine", 'Charolais', 'Friesian', 'Hereford',
-  'Holstein Friesian', 'Jersey', 'Limousin', 'Montbéliarde', 'Parthenaise', 'Salers', 'Shorthorn', 'Simmental',
-];
 
 let tab = 'farm';
 let query = '';
@@ -53,7 +49,7 @@ export function renderHerd(el, { state }) {
 
 function matches(a) {
   const q = query.trim().toLowerCase();
-  return !q || `${a.tag} ${a.breed} ${a.damBreed}`.toLowerCase().includes(q);
+  return !q || `${a.tag} ${a.breed} ${a.damBreed} ${breedName(a.breed)} ${breedName(a.damBreed)}`.toLowerCase().includes(q);
 }
 
 function farmList(onFarm, all) {
@@ -139,9 +135,9 @@ export function renderAnimalForm(el, { state, arg }) {
     return;
   }
   const v = existing ?? { purchaseDate: todayISO() };
-  const breeds = [...new Set([...state.animals.flatMap((a) => [a.breed, a.damBreed]), ...COMMON_BREEDS])]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+  // Card codes, plus any other codes already used in the herd.
+  const used = state.animals.flatMap((a) => [a.breed, a.damBreed]).filter(Boolean).sort();
+  const breeds = [...new Set([...breedOptions(), ...used])];
   const back = existing ? `#animal/${existing.id}` : '#herd';
 
   el.innerHTML = `
@@ -154,10 +150,10 @@ export function renderAnimalForm(el, { state, arg }) {
         <input name="dob" type="date" required max="${todayISO()}" value="${esc(v.dob)}">
       </label>
       <label>Breed
-        <input name="breed" required list="breeds" autocomplete="off" value="${esc(v.breed)}">
+        <input name="breed" required list="breeds" autocomplete="off" autocapitalize="characters" placeholder="Card code, e.g. AAX" value="${esc(v.breed)}">
       </label>
       <label>Dam breed
-        <input name="damBreed" required list="breeds" autocomplete="off" value="${esc(v.damBreed)}">
+        <input name="damBreed" required list="breeds" autocomplete="off" autocapitalize="characters" placeholder="Card code, e.g. FR" value="${esc(v.damBreed)}">
       </label>
       <label>Purchase date
         <input name="purchaseDate" type="date" required max="${todayISO()}" value="${esc(v.purchaseDate)}">
@@ -168,7 +164,7 @@ export function renderAnimalForm(el, { state, arg }) {
       <label>Cost (€)
         <input name="cost" type="number" inputmode="decimal" min="0" step="0.01" required value="${esc(v.cost)}">
       </label>
-      <datalist id="breeds">${breeds.map((b) => `<option value="${esc(b)}">`).join('')}</datalist>
+      <datalist id="breeds">${breeds.map((b) => `<option value="${esc(b)}">${esc(breedName(b))}</option>`).join('')}</datalist>
       <p class="form-error" role="alert" hidden></p>
       <div class="actions">
         <button class="btn primary" type="submit">${existing ? 'Save changes' : 'Add animal'}</button>
@@ -183,8 +179,8 @@ export function renderAnimalForm(el, { state, arg }) {
     const data = {
       tag: f.tag.trim().toUpperCase(),
       dob: f.dob,
-      breed: f.breed.trim(),
-      damBreed: f.damBreed.trim(),
+      breed: toBreedCode(f.breed),
+      damBreed: toBreedCode(f.damBreed),
       purchaseDate: f.purchaseDate,
       purchaseWeight: positive(f.purchaseWeight),
       cost: positive(f.cost),

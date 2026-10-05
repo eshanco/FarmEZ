@@ -1,13 +1,12 @@
 // Firebase web config. These values identify the project and are safe to publish;
 // access to data is controlled by firestore.rules, not by keeping this secret.
-// Replace with the config from Firebase console > Project settings > Your apps.
 export const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT.firebaseapp.com',
-  projectId: 'YOUR_PROJECT',
-  storageBucket: 'YOUR_PROJECT.firebasestorage.app',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: 'AIzaSyDPl7bPvP9k_2Nb-5P7ZQPIoKa-pny7-KI',
+  authDomain: 'farmez-34668.firebaseapp.com',
+  projectId: 'farmez-34668',
+  storageBucket: 'farmez-34668.firebasestorage.app',
+  messagingSenderId: '721016067616',
+  appId: '1:721016067616:web:efdd62267a13583a8c8e45',
 };
 
 export const isConfigured = !firebaseConfig.apiKey.startsWith('YOUR_');

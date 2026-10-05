@@ -3,6 +3,26 @@ import { fmtMoney, fmtPrice, positive } from '../util.js';
 
 let lastWeight = '';
 
+// The €3.00 to €7.00 table for a weight. With `cost` it adds a margin column; with `bid` it
+// marks the row the bid has reached (the highest €/kg whose total the bid covers).
+export function priceTableHtml(kg, { cost = null, bid = null } = {}) {
+  const rows = priceTable(kg);
+  const reached = bid !== null ? rows.findLast((r) => r.total <= bid) : null;
+  const euro = (n) => (Number.isInteger(n) ? fmtMoney(n) : fmtPrice(n));
+  return `
+    <table class="price-table">
+      <thead><tr><th>€/kg</th><th class="num">${kg} kg is worth</th>${cost !== null ? '<th class="num">Margin</th>' : ''}</tr></thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr class="${Number.isInteger(r.pricePerKg) ? 'whole' : ''} ${r === reached ? 'bid' : ''}">
+            <td>${fmtPrice(r.pricePerKg)}</td>
+            <td class="num">${euro(r.total)}</td>
+            ${cost !== null ? `<td class="num">${fmtMoney(r.total - cost)}</td>` : ''}
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
 // `arg` is an optional weight in kg, e.g. #calculator/530.
 export function renderCalculator(el, { arg }) {
   if (arg && positive(arg) !== null) lastWeight = String(positive(arg));
@@ -24,17 +44,7 @@ export function renderCalculator(el, { arg }) {
       out.innerHTML = `<p class="hint">Enter a weight to see what it is worth from €3.00 to €7.00 per kg.</p>`;
       return;
     }
-    out.innerHTML = `
-      <table class="price-table">
-        <thead><tr><th>€/kg</th><th class="num">${kg} kg is worth</th></tr></thead>
-        <tbody>
-          ${priceTable(kg).map((r) => `
-            <tr class="${Number.isInteger(r.pricePerKg) ? 'whole' : ''}">
-              <td>${fmtPrice(r.pricePerKg)}</td>
-              <td class="num">${Number.isInteger(r.total) ? fmtMoney(r.total) : fmtPrice(r.total)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>`;
+    out.innerHTML = priceTableHtml(kg);
   };
   input.addEventListener('input', () => {
     lastWeight = input.value;

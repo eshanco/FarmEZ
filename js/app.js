@@ -1,4 +1,5 @@
 import { signOutUser, watchAuth } from './auth.js';
+import { toBreedCode } from './breeds.js';
 import { subscribeAnimals } from './db.js';
 import { isConfigured } from './firebase-config.js';
 import { toast } from './util.js';
@@ -90,7 +91,8 @@ async function start() {
         user.uid,
         (animals) => {
           const first = state.loading;
-          state.animals = animals;
+          // Records saved before breeds were card codes still hold full names.
+          state.animals = animals.map((a) => ({ ...a, breed: toBreedCode(a.breed), damBreed: toBreedCode(a.damBreed) }));
           state.loading = false;
           if (first || !NO_LIVE_REDRAW.has(route().name)) render();
         },

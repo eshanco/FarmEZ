@@ -1,14 +1,22 @@
 import {
   adg, daysBetween, expectedAdg, latestWeight, monthsBetween, projectedWeight, recentPricePerKg, saleStats,
 } from '../calc.js';
+import { breedName } from '../breeds.js';
 import { deleteAnimal, updateAnimal } from '../db.js';
+import { priceTableHtml } from './calculator.js';
 import {
   esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, getSetting, positive, reportWrite, setSetting,
   showError, todayISO,
 } from '../util.js';
 
+// Interim weigh-ins are switched off while there is no scale on the farm. Set to true to bring
+// back the Weights section; the calculations already use any weigh-ins an animal has.
+const WEIGH_INS_ENABLED = false;
+
 // What the user has typed into the estimate panel, kept across re-renders of the same animal.
 let est = { id: null, date: '', adg: '', price: '' };
+// Sale weight and bid typed at the ring, kept the same way until the sale is recorded.
+let saleDraft = { id: null, weight: '', price: '' };
 
 const SOURCE_TEXT = {
   own: () => "Gain rate is this animal's own average since purchase.",
@@ -25,6 +33,7 @@ export function renderAnimal(el, { state, arg }) {
     return;
   }
   if (est.id !== animal.id) est = { id: animal.id, date: '', adg: '', price: '' };
+  if (saleDraft.id !== animal.id || animal.sale) saleDraft = { id: animal.id, weight: '', price: '' };
 
   const uid = state.user.uid;
   const today = todayISO();
@@ -36,6 +45,7 @@ export function renderAnimal(el, { state, arg }) {
     <div class="page-head">
       <h1>${esc(animal.tag)} <span class="badge ${sold ? 'sold' : ''}">${sold ? 'Sold' : 'On farm'}</span></h1>
       <div class="actions">
+        ${sold ? '' : '<button class="btn primary" type="button" id="go-sell">Sell</button>'}
         <a class="btn" href="#edit/${esc(animal.id)}">Edit</a>
         <button class="btn danger" type="button" id="delete-animal">Delete</button>
       </div>
@@ -43,8 +53,8 @@ export function renderAnimal(el, { state, arg }) {
 
     <section class="card">
       <dl class="facts">
-        <div><dt>Breed</dt><dd>${esc(animal.breed)}</dd></div>
-        <div><dt>Dam breed</dt><dd>${esc(animal.damBreed)}</dd></div>
+        <div><dt>Breed</dt><dd>${breedFact(animal.breed)}</dd></div>
+        <div><dt>Dam breed</dt><dd>${breedFact(animal.damBreed)}</dd></div>
         <div><dt>Born</dt><dd>${fmtDate(animal.dob)} <span class="muted">(${fmtAge(monthsBetween(animal.dob, sold ? animal.sale.date : today))}${sold ? ' at sale' : ''})</span></dd></div>
         <div><dt>Purchased</dt><dd>${fmtDate(animal.purchaseDate)}</dd></div>
         <div><dt>Weight at purchase</dt><dd>${fmtKg(animal.purchaseWeight)}</dd></div>
@@ -54,6 +64,7 @@ export function renderAnimal(el, { state, arg }) {
 
     ${sold ? saleResult(animal) : onFarmSections(animal, last, today)}
 
+    ${!WEIGH_INS_ENABLED ? '' : `
     <section class="card">
       <h2>Weights</h2>
       ${weightHistory(animal)}
@@ -68,24 +79,26 @@ export function renderAnimal(el, { state, arg }) {
         <button class="btn" type="submit">Add weigh-in</button>
         <p class="form-error" role="alert" hidden></p>
       </form>`}
-    </section>
+    </section>`}
 
     ${sold ? '' : `
-    <section class="card">
+    <section class="card" id="sale-section">
       <h2>Record sale</h2>
+      <p class="hint lead">Enter the sale weight to see what each €/kg comes to. Type the bid as it rises to see the €/kg you are getting.</p>
       <form id="sale-form" class="inline-form" novalidate>
         <label>Sale date
           <input name="date" type="date" required min="${esc(last.date)}" max="${today}" value="${today}">
         </label>
         <label>Sale weight (kg)
-          <input name="weight" type="number" inputmode="decimal" min="1" step="0.5" required>
+          <input name="weight" type="number" inputmode="decimal" min="1" step="0.5" required value="${esc(saleDraft.weight)}">
         </label>
-        <label>Sale price (€)
-          <input name="price" type="number" inputmode="decimal" min="0" step="0.01" required>
+        <label>Bid / sale price (€)
+          <input name="price" type="number" inputmode="decimal" min="0" step="0.01" required value="${esc(saleDraft.price)}">
         </label>
         <button class="btn primary" type="submit">Record sale</button>
         <p class="form-error" role="alert" hidden></p>
       </form>
+      <div id="sale-gauge"></div>
     </section>`}`;
 
   const write = async (data) => reportWrite((await updateAnimal(uid, animal.id, data)).done);
@@ -144,7 +157,46 @@ export function renderAnimal(el, { state, arg }) {
     write({ sale: { date: f.date, weight, price } });
   });
 
-  if (!sold) wireEstimate(el, animal, state.animals, last, today);
+  if (!sold) {
+    wireEstimate(el, animal, state.animals, last, today);
+    wireSaleGauge(el, animal, saleForm);
+  }
+}
+
+// Live at the ring: the price table for the sale weight, and what the current bid is per kg.
+function wireSaleGauge(el, animal, form) {
+  const gauge = el.querySelector('#sale-gauge');
+  const update = () => {
+    const weight = positive(form.elements.weight.value);
+    const bid = positive(form.elements.price.value);
+    if (weight === null) {
+      gauge.innerHTML = '';
+      return;
+    }
+    gauge.innerHTML = `
+      ${bid === null ? '' : `
+      <div class="tiles">
+        <div class="tile"><span>Bid is worth</span><strong>${fmtPrice(bid / weight)}/kg</strong></div>
+        <div class="tile"><span>Margin over cost</span><strong class="${bid < animal.cost ? 'neg' : 'pos'}">${fmtMoney(bid - animal.cost)}</strong></div>
+      </div>`}
+      ${priceTableHtml(weight, { cost: animal.cost, bid })}`;
+  };
+  form.addEventListener('input', () => {
+    saleDraft.weight = form.elements.weight.value;
+    saleDraft.price = form.elements.price.value;
+    update();
+  });
+  el.querySelector('#go-sell').addEventListener('click', () => {
+    el.querySelector('#sale-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    form.elements.weight.focus({ preventScroll: true });
+  });
+  update();
+}
+
+// Card code with the full name alongside, e.g. "AAX (Aberdeen Angus cross)".
+function breedFact(code) {
+  const name = breedName(code);
+  return `${esc(code)}${name ? ` <span class="muted">(${esc(name)})</span>` : ''}`;
 }
 
 function onFarmSections(animal, last, today) {

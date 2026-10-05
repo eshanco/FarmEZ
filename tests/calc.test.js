@@ -120,3 +120,22 @@ test('groupStats averages sold animals per group, ignoring case and spacing', ()
   assert.equal(charolais.profit, 700);
   assert.equal(groups.find((g) => g.label === 'Hereford').count, 1);
 });
+
+test('breed codes follow the cattle card: code, with X for a cross', async () => {
+  const { breedName, breedOptions, toBreedCode } = await import('../js/breeds.js');
+  assert.equal(toBreedCode(' aax '), 'AAX');
+  assert.equal(toBreedCode('Aberdeen Angus'), 'AA');
+  assert.equal(toBreedCode('charolais cross'), 'CHX');
+  assert.equal(toBreedCode('Limousin X'), 'LMX');
+  assert.equal(toBreedCode('zz'), 'ZZ');
+  assert.equal(toBreedCode(''), '');
+  assert.equal(breedName('AA'), 'Aberdeen Angus');
+  assert.equal(breedName('AAX'), 'Aberdeen Angus cross');
+  assert.equal(breedName('ZZ'), '');
+  assert.deepEqual(breedOptions().slice(0, 17), [
+    'AAX', 'CHX', 'LMX', 'HEX', 'SHX', 'SAX', 'FRX', 'BBX',
+    'AA', 'CH', 'LM', 'HE', 'SH', 'SA', 'FR', 'BB',
+    'AU',
+  ]);
+  assert.equal(new Set(breedOptions()).size, breedOptions().length);
+});

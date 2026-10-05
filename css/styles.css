@@ -285,6 +285,10 @@ th[aria-sort] button::after { content: " ▾"; }
 
 .price-table { margin-top: 16px; font-size: 1.05rem; }
 .price-table tr.whole td { font-weight: 700; background: var(--accent-soft); }
+.price-table tr.bid td { font-weight: 700; background: var(--accent); color: var(--accent-text); }
+#sale-gauge:not(:empty) { margin-top: 16px; }
+#sale-gauge .tiles { margin-bottom: 0; }
+.hint.lead { margin: -4px 0 12px; }
 
 .history td, .history th { padding-inline: 4px; }
 .history td { white-space: nowrap; }
