@@ -40,24 +40,6 @@ export function positive(value) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// Per-device preferences. Storage can be unavailable (private windows), so failures are ignored.
-export function getSetting(key) {
-  try {
-    return positive(localStorage.getItem(`farmez.${key}`) ?? '');
-  } catch {
-    return null;
-  }
-}
-
-export function setSetting(key, value) {
-  try {
-    if (value === null) localStorage.removeItem(`farmez.${key}`);
-    else localStorage.setItem(`farmez.${key}`, String(value));
-  } catch {
-    // ignore
-  }
-}
-
 export function showError(form, message) {
   const el = form.querySelector('.form-error');
   if (!el) return;

@@ -44,7 +44,7 @@ For an animal still on the farm, the gain rate used for projections is the first
 4. the average of all sold animals;
 5. a figure you type in.
 
-**Projected weight** is the last known weight plus that rate for each day since. **Estimated sale price** is projected weight × €/kg, where €/kg defaults to the average of your last five sales and can be changed on any animal.
+**Projected weight** is the last known weight plus that rate for each day since. **Estimated sale price** is projected weight × €/kg, where €/kg defaults to the average of your last five sales and can be changed on any animal. The €/kg and gain rate you type are saved to your account, so every device you sign in on shows the same estimates.
 
 ## Development
 

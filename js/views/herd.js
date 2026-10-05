@@ -1,8 +1,9 @@
 import { adg, daysBetween, expectedAdg, latestWeight, projectedWeight, recentPricePerKg, saleStats } from '../calc.js';
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
+import { getSetting } from '../settings.js';
 import {
-  esc, fmtAdg, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, getSetting, positive, reportWrite, showError, todayISO,
+  esc, fmtAdg, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
 
 let tab = 'farm';

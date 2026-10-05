@@ -2,6 +2,7 @@ import { signOutUser, watchAuth } from './auth.js';
 import { toBreedCode } from './breeds.js';
 import { subscribeAnimals } from './db.js';
 import { isConfigured } from './firebase-config.js';
+import { watchSettings } from './settings.js';
 import { toast } from './util.js';
 import { renderAnimal } from './views/animal.js';
 import { renderCalculator } from './views/calculator.js';
@@ -76,10 +77,13 @@ async function start() {
   if (!isConfigured) return;
 
   let unsubscribe = null;
+  let unwatchSettings = null;
   try {
     await watchAuth(async (user) => {
       unsubscribe?.();
       unsubscribe = null;
+      unwatchSettings?.();
+      unwatchSettings = null;
       state.user = user;
       state.animals = [];
       state.authReady = true;
@@ -102,6 +106,14 @@ async function start() {
             : `Database error: ${err.code ?? err.message}`;
           render();
         },
+      );
+      // The €/kg and gain rate behind the estimates, shared between the user's devices.
+      unwatchSettings = await watchSettings(
+        user.uid,
+        () => {
+          if (!state.loading && !NO_LIVE_REDRAW.has(route().name)) render();
+        },
+        (err) => toast(`Could not load saved estimates: ${err.code ?? err.message}`),
       );
     });
   } catch (err) {

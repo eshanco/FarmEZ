@@ -4,9 +4,9 @@ import {
 import { breedName } from '../breeds.js';
 import { deleteAnimal, updateAnimal } from '../db.js';
 import { priceTableHtml } from './calculator.js';
+import { getSetting, setSetting } from '../settings.js';
 import {
-  esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, getSetting, positive, reportWrite, setSetting,
-  showError, todayISO,
+  esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
 
 // Interim weigh-ins are switched off while there is no scale on the farm. Set to true to bring
