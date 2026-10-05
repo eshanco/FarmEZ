@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FarmEZ</title>
+  <meta name="description" content="Track cattle purchases and sales, estimate weight gain and sale prices.">
+  <meta name="theme-color" content="#2f6b3a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="#herd">FarmEZ</a>
+    <nav id="nav" aria-label="Main">
+      <a href="#herd" data-section="herd">Herd</a>
+      <a href="#calculator" data-section="calculator">Calculator</a>
+      <a href="#insights" data-section="insights">Insights</a>
+    </nav>
+    <button class="btn small" type="button" id="sign-out" hidden>Sign out</button>
+  </header>
+
+  <main id="view"></main>
+
+  <div id="toast" role="alert" hidden></div>
+  <noscript><p style="padding:16px">FarmEZ needs JavaScript to run.</p></noscript>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
