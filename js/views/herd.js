@@ -411,7 +411,8 @@ export function renderAnimalForm(el, { state, arg }) {
     const addingLocation = f.location === NEW_LOCATION;
     const typed = f.newLocation.trim();
     // A new name that only differs in capitals from an existing location reuses that one.
-    const location = addingLocation
+    // Not named `location`: that would hide window.location, which the redirect below needs.
+    const place = addingLocation
       ? locations.find((l) => l.toLowerCase() === typed.toLowerCase()) ?? typed
       : f.location;
     const data = {
@@ -422,7 +423,7 @@ export function renderAnimalForm(el, { state, arg }) {
       purchaseDate: f.purchaseDate,
       purchaseWeight: positive(f.purchaseWeight),
       cost: positive(f.cost),
-      location,
+      location: place,
       wintered: f.wintered === 'yes',
     };
 
@@ -436,7 +437,7 @@ export function renderAnimalForm(el, { state, arg }) {
     else if (!data.tag ||!data.dob || !data.breed || !data.damBreed || !data.purchaseDate) error = 'Fill in every field.';
     else if (data.purchaseWeight === null) error = 'Enter the weight at purchase in kg.';
     else if (data.cost === null) error = 'Enter the cost in euro.';
-    else if (addingLocation && !location) error = 'Enter a name for the new location, or choose No location.';
+    else if (addingLocation && !place) error = 'Enter a name for the new location, or choose No location.';
     else if (data.dob > data.purchaseDate) error = 'Date of birth cannot be after the purchase date.';
     else if (data.purchaseDate > todayISO()) error = 'Purchase date cannot be in the future.';
     else if (firstLater && data.purchaseDate > firstLater) error = `Purchase date cannot be after a recorded weight (${fmtDate(firstLater)}).`;
