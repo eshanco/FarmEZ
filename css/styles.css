@@ -186,7 +186,7 @@ button.link {
 
 /* ---------- Forms ---------- */
 
-label {
+label, .field {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -237,7 +237,7 @@ input, select {
 }
 .tabs button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
 
-.sort-select { margin-bottom: 16px; }
+.sort-select { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; margin-bottom: 16px; }
 
 .selling-bar { display: grid; gap: 12px; margin-bottom: 16px; }
 
@@ -314,6 +314,7 @@ th button {
 }
 th[aria-sort] button { color: var(--accent); }
 th[aria-sort] button::after { content: " ▾"; }
+th[aria-sort="ascending"] button::after { content: " ▴"; }
 
 .price-table { margin-top: 16px; font-size: 1.05rem; }
 .price-table tr.whole td { font-weight: 700; background: var(--accent-soft); }

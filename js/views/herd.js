@@ -358,6 +358,13 @@ export function renderAnimalForm(el, { state, arg }) {
       <label id="new-location" hidden>New location name
         <input name="newLocation" autocomplete="off" placeholder="e.g. Home shed">
       </label>
+      <div class="field" role="group" aria-label="Wintered">Wintered <span class="muted">(optional)</span>
+        <div class="tabs">
+          <button type="button" data-wintered="" aria-pressed="${!v.wintered}">No</button>
+          <button type="button" data-wintered="yes" aria-pressed="${Boolean(v.wintered)}">Yes</button>
+        </div>
+        <input type="hidden" name="wintered" value="${v.wintered ? 'yes' : ''}">
+      </div>
       <datalist id="breeds">${breeds.map((b) => `<option value="${esc(b)}">${esc(breedName(b))}</option>`).join('')}</datalist>
       <p class="form-error" role="alert" hidden></p>
       <div class="actions">
@@ -372,6 +379,12 @@ export function renderAnimalForm(el, { state, arg }) {
     form.querySelector('#new-location').hidden = !adding;
     if (adding) form.elements.newLocation.focus();
   });
+  form.querySelectorAll('[data-wintered]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      form.elements.wintered.value = btn.dataset.wintered;
+      form.querySelectorAll('[data-wintered]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    }),
+  );
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(form));
@@ -390,6 +403,7 @@ export function renderAnimalForm(el, { state, arg }) {
       purchaseWeight: positive(f.purchaseWeight),
       cost: positive(f.cost),
       location,
+      wintered: f.wintered === 'yes',
     };
 
     const firstLater = [...(existing?.weighIns ?? []).map((w) => w.date), existing?.sale?.date]
