@@ -14,6 +14,8 @@ let sellDate = '';
 let sellDateTimer;
 // Sale year the Sold tab is limited to, or 'all'. Insights groups by purchase year instead.
 let soldYear = 'all';
+// Column and direction the Sold table is sorted by; newest sale first to begin with.
+let soldSort = { key: 'date', dir: 'desc' };
 // Whether the rest-of-herd table on the Selling tab is expanded.
 let restOpen = false;
 
@@ -66,6 +68,22 @@ export function renderHerd(el, { state }) {
         draw();
       }),
     );
+    // Picking the column already sorted on flips the direction; a new column starts highest first.
+    list.querySelectorAll('[data-sold-sort]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.soldSort;
+        soldSort = { key, dir: key === soldSort.key && soldSort.dir === 'desc' ? 'asc' : 'desc' };
+        draw();
+      }),
+    );
+    list.querySelector('#sold-sort-by')?.addEventListener('change', (e) => {
+      soldSort = { key: e.target.value, dir: 'desc' };
+      draw();
+    });
+    list.querySelector('#sold-sort-dir')?.addEventListener('click', () => {
+      soldSort = { ...soldSort, dir: soldSort.dir === 'asc' ? 'desc' : 'asc' };
+      draw();
+    });
   };
   draw();
 
@@ -289,6 +307,15 @@ function restRows(rest, all, date) {
     </details>`;
 }
 
+const SOLD_COLUMNS = [
+  { key: 'date', label: 'Sold' },
+  { key: 'days', label: 'Days on farm', num: true },
+  { key: 'gain', label: 'Gain', num: true },
+  { key: 'price', label: 'Price', num: true },
+  { key: 'pricePerKg', label: '€/kg', num: true },
+  { key: 'profit', label: 'Profit', num: true },
+];
+
 function soldList(sold) {
   if (!sold.length) return `<p class="empty">No sales recorded yet. Open an animal to record its sale.</p>`;
   const soldIn = (a) => a.sale.date.slice(0, 4);
@@ -300,33 +327,48 @@ function soldList(sold) {
         ${['all', ...years].map((y) => `<button type="button" data-sold-year="${y}" aria-pressed="${y === soldYear}">${y === 'all' ? 'All' : y}</button>`).join('')}
       </div>
     </div>`;
+  const sign = soldSort.dir === 'asc' ? 1 : -1;
   const shown = sold
     .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
-    .sort((x, y) => (x.sale.date < y.sale.date ? 1 : -1));
+    .map((a) => {
+      const s = saleStats(a);
+      return { a, date: a.sale.date, days: s.days, gain: adg(a), price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
+    })
+    // Rows with no figure in the sorted column stay at the bottom either way.
+    .sort((x, y) => {
+      const [p, q] = [x[soldSort.key], y[soldSort.key]];
+      if (p === null || q === null) return (p === null) - (q === null);
+      return sign * (p < q ? -1 : p > q ? 1 : 0);
+    });
   if (!shown.length) return `${yearTabs}<p class="empty">No animals match “${esc(query)}”.</p>`;
 
   return `
     ${yearTabs}
+    <div class="sort-select">
+      <label>Sort by
+        <select id="sold-sort-by">
+          ${SOLD_COLUMNS.map((c) => `<option value="${c.key}" ${c.key === soldSort.key ? 'selected' : ''}>${c.label}</option>`).join('')}
+        </select>
+      </label>
+      <button class="btn" type="button" id="sold-sort-dir">${soldSort.dir === 'asc' ? 'Lowest first' : 'Highest first'}</button>
+    </div>
     <table class="cards">
       <thead><tr>
-        <th>Tag</th><th>Breed</th><th>Sold</th><th class="num">Days on farm</th>
-        <th class="num">Gain</th><th class="num">Price</th><th class="num">€/kg</th><th class="num">Profit</th>
+        <th>Tag</th><th>Breed</th>
+        ${SOLD_COLUMNS.map((c) => `<th ${c.num ? 'class="num"' : ''} ${c.key === soldSort.key ? `aria-sort="${soldSort.dir === 'asc' ? 'ascending' : 'descending'}"` : ''}><button type="button" data-sold-sort="${c.key}">${c.label}</button></th>`).join('')}
       </tr></thead>
       <tbody>
-        ${shown.map((a) => {
-          const s = saleStats(a);
-          return `
+        ${shown.map(({ a, date, days, gain, price, pricePerKg, profit }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
-            <td data-label="Sold">${fmtDate(a.sale.date)}</td>
-            <td class="num" data-label="Days on farm">${fmtInt(s.days)}</td>
-            <td class="num" data-label="Gain">${fmtAdg(adg(a))}</td>
-            <td class="num" data-label="Price">${fmtMoney(a.sale.price)}</td>
-            <td class="num" data-label="€/kg">${fmtPrice(s.pricePerKg)}</td>
-            <td class="num ${s.profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(s.profit)}</td>
-          </tr>`;
-        }).join('')}
+            <td data-label="Sold">${fmtDate(date)}</td>
+            <td class="num" data-label="Days on farm">${fmtInt(days)}</td>
+            <td class="num" data-label="Gain">${fmtAdg(gain)}</td>
+            <td class="num" data-label="Price">${fmtMoney(price)}</td>
+            <td class="num" data-label="€/kg">${fmtPrice(pricePerKg)}</td>
+            <td class="num ${profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(profit)}</td>
+          </tr>`).join('')}
       </tbody>
     </table>`;
 }
