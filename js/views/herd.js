@@ -12,6 +12,8 @@ let query = '';
 // Sale date chosen on the Selling tab this session; '' means not chosen yet.
 let sellDate = '';
 let sellDateTimer;
+// Sale year the Sold tab is limited to, or 'all'. Insights groups by purchase year instead.
+let soldYear = 'all';
 // Whether the rest-of-herd table on the Selling tab is expanded.
 let restOpen = false;
 
@@ -58,6 +60,12 @@ export function renderHerd(el, { state }) {
   const draw = () => {
     if (tab === 'selling') renderSelling(list, state, onFarm, selling);
     else list.innerHTML = tab === 'farm' ? farmList(onFarm, state.animals) : soldList(sold);
+    list.querySelectorAll('[data-sold-year]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        soldYear = btn.dataset.soldYear;
+        draw();
+      }),
+    );
   };
   draw();
 
@@ -282,10 +290,22 @@ function restRows(rest, all, date) {
 
 function soldList(sold) {
   if (!sold.length) return `<p class="empty">No sales recorded yet. Open an animal to record its sale.</p>`;
-  const shown = sold.filter(matches).sort((x, y) => (x.sale.date < y.sale.date ? 1 : -1));
-  if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
+  const soldIn = (a) => a.sale.date.slice(0, 4);
+  const years = [...new Set(sold.map(soldIn))].sort().reverse();
+  if (!years.includes(soldYear)) soldYear = 'all';
+  const yearTabs = `
+    <div class="toolbar">
+      <div class="tabs">
+        ${['all', ...years].map((y) => `<button type="button" data-sold-year="${y}" aria-pressed="${y === soldYear}">${y === 'all' ? 'All' : y}</button>`).join('')}
+      </div>
+    </div>`;
+  const shown = sold
+    .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
+    .sort((x, y) => (x.sale.date < y.sale.date ? 1 : -1));
+  if (!shown.length) return `${yearTabs}<p class="empty">No animals match “${esc(query)}”.</p>`;
 
   return `
+    ${yearTabs}
     <table class="cards">
       <thead><tr>
         <th>Tag</th><th>Breed</th><th>Sold</th><th class="num">Days on farm</th>
