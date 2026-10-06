@@ -12,10 +12,25 @@ let query = '';
 // Sale date chosen on the Selling tab this session; '' means not chosen yet.
 let sellDate = '';
 let sellDateTimer;
+// Whether the rest-of-herd table on the Selling tab is expanded.
+let restOpen = false;
 
 // An animal is lined up for sale when it carries a sellingDate and has not been sold.
 const isSelling = (a) => !a.sale && Boolean(a.sellingDate);
 const byTag = (x, y) => x.tag.localeCompare(y.tag, undefined, { numeric: true });
+
+// Option value for typing a new location instead of picking one.
+const NEW_LOCATION = '__new__';
+
+// Locations already given to an animal, one spelling each, in alphabetical order.
+function locationsOf(animals) {
+  const byKey = new Map();
+  for (const a of animals) {
+    const name = (a.location ?? '').trim();
+    if (name && !byKey.has(name.toLowerCase())) byKey.set(name.toLowerCase(), name);
+  }
+  return [...byKey.values()].sort((x, y) => x.localeCompare(y, undefined, { numeric: true }));
+}
 
 const breedLabel = (a) => (a.damBreed ? `${a.breed} × ${a.damBreed}` : a.breed);
 
@@ -154,9 +169,15 @@ function renderSelling(list, state, onFarm, selling) {
   const save = async (id, data) => reportWrite((await updateAnimal(uid, id, data)).done);
 
   const drawRows = () => {
-    rowsEl.innerHTML = sellingRows(selling, state.animals, saleDate());
+    rowsEl.innerHTML = sellingRows(selling, state.animals, saleDate()) + restRows(candidates, state.animals, saleDate());
+    rowsEl.querySelector('#rest-herd')?.addEventListener('toggle', (e) => {
+      restOpen = e.target.open;
+    });
     rowsEl.querySelectorAll('[data-unsell]').forEach((btn) =>
       btn.addEventListener('click', () => save(btn.dataset.unsell, { sellingDate: null })),
+    );
+    rowsEl.querySelectorAll('[data-sell]').forEach((btn) =>
+      btn.addEventListener('click', () => save(btn.dataset.sell, { sellingDate: saleDate() })),
     );
   };
   drawRows();
@@ -187,11 +208,9 @@ function renderSelling(list, state, onFarm, selling) {
   });
 }
 
-function sellingRows(selling, all, date) {
-  if (!selling.length) {
-    return `<p class="empty">No animals lined up for sale. Press <strong>Add from herd</strong> to pick the ones you are selling.</p>`;
-  }
-  const rows = selling
+// Weight, value and margin of each animal if it were sold on `date`.
+function saleEstimates(animals, all, date) {
+  return animals
     .map((a) => {
       const exp = expectedAdg(a, all);
       const price = expectedPricePerKg(a, all);
@@ -200,17 +219,13 @@ function sellingRows(selling, all, date) {
       return { a, weight, value, margin: value !== null ? value - a.cost : null };
     })
     .sort((x, y) => byTag(x.a, y.a));
-  const shown = rows.filter((r) => matches(r.a));
-  if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
+}
 
-  const sum = (key) => rows.reduce((total, r) => total + (r[key] ?? 0), 0);
-  const summary = pricedSummary(
-    rows,
-    `${rows.length} to sell on ${fmtDate(date)}: estimated value <strong>${fmtMoney(sum('value'))}</strong>, margin <strong>${fmtMoney(sum('margin'))}</strong>`,
-  );
+const sumOf = (rows, key) => rows.reduce((total, r) => total + (r[key] ?? 0), 0);
 
+// `action` builds the button cell for an animal.
+function estimateTable(shown, action) {
   return `
-    <p class="summary">${summary}</p>
     <table class="cards">
       <thead><tr>
         <th>Tag</th><th>Breed</th><th class="num">Est. weight</th>
@@ -224,10 +239,45 @@ function sellingRows(selling, all, date) {
             <td class="num" data-label="Est. weight">${fmtKg(weight)}</td>
             <td class="num" data-label="Est. value">${fmtMoney(value)}</td>
             <td class="num ${margin !== null && margin < 0 ? 'neg' : ''}" data-label="Est. margin">${fmtMoney(margin)}</td>
-            <td class="num row-action"><button class="btn small" type="button" data-unsell="${esc(a.id)}" aria-label="Remove ${esc(a.tag)} from selling">Remove</button></td>
+            ${action(a)}
           </tr>`).join('')}
       </tbody>
     </table>`;
+}
+
+function sellingRows(selling, all, date) {
+  if (!selling.length) {
+    return `<p class="empty">No animals lined up for sale. Press <strong>Add from herd</strong> to pick the ones you are selling.</p>`;
+  }
+  const rows = saleEstimates(selling, all, date);
+  const shown = rows.filter((r) => matches(r.a));
+  if (!shown.length) return `<p class="empty">No animals match “${esc(query)}”.</p>`;
+
+  const summary = pricedSummary(
+    rows,
+    `${rows.length} to sell on ${fmtDate(date)}: estimated value <strong>${fmtMoney(sumOf(rows, 'value'))}</strong>, margin <strong>${fmtMoney(sumOf(rows, 'margin'))}</strong>`,
+  );
+
+  return `
+    <p class="summary">${summary}</p>
+    ${estimateTable(shown, (a) => `<td class="num row-action"><button class="btn small" type="button" data-unsell="${esc(a.id)}" aria-label="Remove ${esc(a.tag)} from selling">Remove</button></td>`)}`;
+}
+
+// The animals staying on the farm, collapsed until opened, with the same estimates for the sale date.
+function restRows(rest, all, date) {
+  if (!rest.length) return '';
+  const rows = saleEstimates(rest, all, date);
+  const shown = rows.filter((r) => matches(r.a));
+  const summary = pricedSummary(
+    rows,
+    `${rows.length} not being sold: estimated value on ${fmtDate(date)} <strong>${fmtMoney(sumOf(rows, 'value'))}</strong>, margin <strong>${fmtMoney(sumOf(rows, 'margin'))}</strong>`,
+  );
+
+  return `
+    <details class="rest" id="rest-herd" ${restOpen ? 'open' : ''}>
+      <summary>Rest of herd (${rows.length})</summary>
+      ${shown.length ? `<p class="summary">${summary}</p>${estimateTable(shown, (a) => `<td class="num row-action"><button class="btn small" type="button" data-sell="${esc(a.id)}" aria-label="Add ${esc(a.tag)} to selling">Add</button></td>`)}` : `<p class="empty">No animals match “${esc(query)}”.</p>`}
+    </details>`;
 }
 
 function soldList(sold) {
@@ -271,6 +321,7 @@ export function renderAnimalForm(el, { state, arg }) {
   // Card codes, plus any other codes already used in the herd.
   const used = state.animals.flatMap((a) => [a.breed, a.damBreed]).filter(Boolean).sort();
   const breeds = [...new Set([...breedOptions(), ...used])];
+  const locations = locationsOf(state.animals);
   const back = existing ? `#animal/${existing.id}` : '#herd';
 
   el.innerHTML = `
@@ -297,6 +348,16 @@ export function renderAnimalForm(el, { state, arg }) {
       <label>Cost (€)
         <input name="cost" type="number" inputmode="decimal" min="0" step="0.01" required value="${esc(v.cost)}">
       </label>
+      <label>Location <span class="muted">(optional)</span>
+        <select name="location">
+          <option value="">No location</option>
+          ${locations.map((l) => `<option value="${esc(l)}" ${l === v.location ? 'selected' : ''}>${esc(l)}</option>`).join('')}
+          <option value="${NEW_LOCATION}">New location…</option>
+        </select>
+      </label>
+      <label id="new-location" hidden>New location name
+        <input name="newLocation" autocomplete="off" placeholder="e.g. Home shed">
+      </label>
       <datalist id="breeds">${breeds.map((b) => `<option value="${esc(b)}">${esc(breedName(b))}</option>`).join('')}</datalist>
       <p class="form-error" role="alert" hidden></p>
       <div class="actions">
@@ -306,9 +367,20 @@ export function renderAnimalForm(el, { state, arg }) {
     </form>`;
 
   const form = el.querySelector('form');
+  form.elements.location.addEventListener('change', (e) => {
+    const adding = e.target.value === NEW_LOCATION;
+    form.querySelector('#new-location').hidden = !adding;
+    if (adding) form.elements.newLocation.focus();
+  });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(form));
+    const addingLocation = f.location === NEW_LOCATION;
+    const typed = f.newLocation.trim();
+    // A new name that only differs in capitals from an existing location reuses that one.
+    const location = addingLocation
+      ? locations.find((l) => l.toLowerCase() === typed.toLowerCase()) ?? typed
+      : f.location;
     const data = {
       tag: f.tag.trim().toUpperCase(),
       dob: f.dob,
@@ -317,15 +389,20 @@ export function renderAnimalForm(el, { state, arg }) {
       purchaseDate: f.purchaseDate,
       purchaseWeight: positive(f.purchaseWeight),
       cost: positive(f.cost),
+      location,
     };
 
     const firstLater = [...(existing?.weighIns ?? []).map((w) => w.date), existing?.sale?.date]
       .filter(Boolean)
       .sort()[0];
+    // A typed date that does not exist (e.g. 29 February in a non-leap year) reads back as empty.
+    const badDate = ['dob', 'purchaseDate'].find((name) => form.elements[name].validity.badInput);
     let error = null;
-    if (!data.tag || !data.dob || !data.breed || !data.damBreed || !data.purchaseDate) error = 'Fill in every field.';
+    if (badDate) error = `${badDate === 'dob' ? 'Date of birth' : 'Purchase date'} is not a real date. Check the day and month.`;
+    else if (!data.tag ||!data.dob || !data.breed || !data.damBreed || !data.purchaseDate) error = 'Fill in every field.';
     else if (data.purchaseWeight === null) error = 'Enter the weight at purchase in kg.';
     else if (data.cost === null) error = 'Enter the cost in euro.';
+    else if (addingLocation && !location) error = 'Enter a name for the new location, or choose No location.';
     else if (data.dob > data.purchaseDate) error = 'Date of birth cannot be after the purchase date.';
     else if (data.purchaseDate > todayISO()) error = 'Purchase date cannot be in the future.';
     else if (firstLater && data.purchaseDate > firstLater) error = `Purchase date cannot be after a recorded weight (${fmtDate(firstLater)}).`;

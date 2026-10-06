@@ -60,6 +60,7 @@ export function renderAnimal(el, { state, arg }) {
         <div><dt>Purchased</dt><dd>${fmtDate(animal.purchaseDate)}</dd></div>
         <div><dt>Weight at purchase</dt><dd>${fmtKg(animal.purchaseWeight)}</dd></div>
         <div><dt>Cost</dt><dd>${fmtMoney(animal.cost)} <span class="muted">(${fmtPrice(animal.cost / animal.purchaseWeight)}/kg)</span></dd></div>
+        ${animal.location ? `<div><dt>Location</dt><dd>${esc(animal.location)}</dd></div>` : ''}
       </dl>
     </section>
 

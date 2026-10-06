@@ -241,6 +241,10 @@ input, select {
 
 .selling-bar { display: grid; gap: 12px; margin-bottom: 16px; }
 
+.rest { margin-top: 24px; }
+.rest > summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.rest[open] > summary { margin-bottom: 8px; }
+
 dialog {
   width: min(480px, calc(100vw - 32px));
   max-height: 85vh;
