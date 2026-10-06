@@ -224,7 +224,7 @@ function saleEstimates(animals, all, date) {
       const price = expectedPricePerKg(a, all);
       const weight = exp.value !== null ? projectedWeight(a, exp.value, date) : latestWeight(a).kg;
       const value = price !== null ? weight * price : null;
-      return { a, weight, value, margin: value !== null ? value - a.cost : null };
+      return { a, weight, price, value, margin: value !== null ? value - a.cost : null };
     })
     .sort((x, y) => byTag(x.a, y.a));
 }
@@ -236,15 +236,16 @@ function estimateTable(shown, action) {
   return `
     <table class="cards">
       <thead><tr>
-        <th>Tag</th><th>Breed</th><th class="num">Est. weight</th>
+        <th>Tag</th><th>Breed</th><th class="num">Est. weight</th><th class="num">Est. €/kg</th>
         <th class="num">Est. value</th><th class="num">Est. margin</th><th></th>
       </tr></thead>
       <tbody>
-        ${shown.map(({ a, weight, value, margin }) => `
+        ${shown.map(({ a, weight, price, value, margin }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
             <td class="num" data-label="Est. weight">${fmtKg(weight)}</td>
+            <td class="num" data-label="Est. €/kg">${fmtPrice(price)}</td>
             <td class="num" data-label="Est. value">${fmtMoney(value)}</td>
             <td class="num ${margin !== null && margin < 0 ? 'neg' : ''}" data-label="Est. margin">${fmtMoney(margin)}</td>
             ${action(a)}
