@@ -1,10 +1,10 @@
 import {
-  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, projectedWeight, saleStats,
+  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleStats,
 } from '../calc.js';
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
 import {
-  esc, fmtAdg, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
+  esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
 
 let tab = 'farm';
@@ -167,7 +167,7 @@ function pricedSummary(rows, text) {
 
 const FARM_COLUMNS = [
   { key: 'tag', label: 'Tag' },
-  { key: 'days', label: 'Days on farm', num: true },
+  { key: 'age', label: 'Age', num: true },
   { key: 'last', label: 'Last weight', num: true },
   { key: 'gain', label: 'Gain', num: true },
   { key: 'weight', label: 'Est. weight today', num: true },
@@ -188,7 +188,7 @@ function farmList(onFarm, all) {
     const weight = exp.value !== null ? projectedWeight(a, exp.value, today) : last;
     return {
       a, exp, last, weight,
-      days: daysBetween(a.purchaseDate, today),
+      age: daysBetween(a.dob, today),
       gain: exp.value,
       value: price !== null ? weight * price : null,
     };
@@ -207,11 +207,11 @@ function farmList(onFarm, all) {
         ${sortHeads('farm', [TAG_COLUMN])}<th>Breed</th>${sortHeads('farm', FARM_FIGURES)}
       </tr></thead>
       <tbody>
-        ${shown.map(({ a, exp, days, last, weight, value }) => `
+        ${shown.map(({ a, exp, age, last, weight, value }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a>${isSelling(a) ? ' <span class="badge">Selling</span>' : ''}</td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
-            <td class="num" data-label="Days on farm">${fmtInt(days)}</td>
+            <td class="num" data-label="Age">${fmtAge(monthsBetween(a.dob, today))} <span class="muted">(${fmtInt(age)} days)</span></td>
             <td class="num" data-label="Last weight">${fmtKg(last)}</td>
             <td class="num" data-label="Gain">${fmtAdg(exp.value)}${exp.value !== null && exp.source !== 'own' ? ' <span class="muted">est.</span>' : ''}</td>
             <td class="num" data-label="Est. weight today">${fmtKg(weight)}</td>
@@ -384,6 +384,8 @@ const SOLD_FIGURES = [
   { key: 'date', label: 'Sold' },
   { key: 'days', label: 'Days on farm', num: true },
   { key: 'gain', label: 'Gain', num: true },
+  { key: 'weight', label: 'Weight', num: true },
+  { key: 'gained', label: 'Weight gain', num: true },
   { key: 'price', label: 'Price', num: true },
   { key: 'pricePerKg', label: '€/kg', num: true },
   { key: 'profit', label: 'Profit', num: true },
@@ -405,7 +407,7 @@ function soldList(sold) {
       .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
       .map((a) => {
         const s = saleStats(a);
-        return { a, date: a.sale.date, days: s.days, gain: adg(a), price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
+        return { a, date: a.sale.date, days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
       }),
     sorts.sold,
   );
@@ -419,13 +421,15 @@ function soldList(sold) {
         ${sortHeads('sold', [TAG_COLUMN])}<th>Breed</th>${sortHeads('sold', SOLD_FIGURES)}
       </tr></thead>
       <tbody>
-        ${shown.map(({ a, date, days, gain, price, pricePerKg, profit }) => `
+        ${shown.map(({ a, date, days, gain, weight, gained, price, pricePerKg, profit }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
             <td data-label="Sold">${fmtDate(date)}</td>
             <td class="num" data-label="Days on farm">${fmtInt(days)}</td>
             <td class="num" data-label="Gain">${fmtAdg(gain)}</td>
+            <td class="num" data-label="Weight">${fmtKg(weight)}</td>
+            <td class="num" data-label="Weight gain">${fmtKg(gained)}</td>
             <td class="num" data-label="Price">${fmtMoney(price)}</td>
             <td class="num" data-label="€/kg">${fmtPrice(pricePerKg)}</td>
             <td class="num ${profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(profit)}</td>

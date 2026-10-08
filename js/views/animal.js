@@ -40,6 +40,8 @@ export function renderAnimal(el, { state, arg }) {
   const today = todayISO();
   const last = latestWeight(animal);
   const sold = Boolean(animal.sale);
+  // A sold animal's age is counted to the day it was sold.
+  const ageDate = sold ? animal.sale.date : today;
 
   el.innerHTML = `
     <a class="back" href="#herd">‹ Herd</a>
@@ -56,8 +58,8 @@ export function renderAnimal(el, { state, arg }) {
       <dl class="facts">
         <div><dt>Breed</dt><dd>${breedFact(animal.breed)}</dd></div>
         <div><dt>Dam breed</dt><dd>${breedFact(animal.damBreed)}</dd></div>
-        <div><dt>Born</dt><dd>${fmtDate(animal.dob)} <span class="muted">(${fmtAge(monthsBetween(animal.dob, sold ? animal.sale.date : today))}${sold ? ' at sale' : ''})</span></dd></div>
-        <div><dt>Purchased</dt><dd>${fmtDate(animal.purchaseDate)}</dd></div>
+        <div><dt>Born</dt><dd>${fmtDate(animal.dob)} <span class="muted">(${fmtAge(monthsBetween(animal.dob, ageDate))}, ${fmtInt(daysBetween(animal.dob, ageDate))} days${sold ? ' at sale' : ''})</span></dd></div>
+        <div><dt>Purchased</dt><dd>${fmtDate(animal.purchaseDate)} <span class="muted">(${fmtInt(daysBetween(animal.dob, animal.purchaseDate))} days old)</span></dd></div>
         <div><dt>Weight at purchase</dt><dd>${fmtKg(animal.purchaseWeight)}</dd></div>
         <div><dt>Cost</dt><dd>${fmtMoney(animal.cost)} <span class="muted">(${fmtPrice(animal.cost / animal.purchaseWeight)}/kg)</span></dd></div>
         ${animal.wintered ? '<div><dt>Wintered</dt><dd>Yes</dd></div>' : ''}
