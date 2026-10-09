@@ -246,7 +246,7 @@ function renderSelling(list, state, onFarm, selling) {
         ${candidates.map((a) => `
           <label class="pick" data-text="${esc(`${a.tag} ${a.breed} ${a.damBreed}`.toLowerCase())}">
             <input type="checkbox" value="${esc(a.id)}">
-            <span><strong>${esc(a.tag)}</strong> <span class="muted">${esc(breedLabel(a))}</span></span>
+            <span><strong>${esc(a.tag)}</strong> <span class="muted">${esc(breedLabel(a))} · born ${fmtDate(a.dob)}</span></span>
           </label>`).join('')}
       </div>` : '<p class="hint">Every animal on the farm is already in the selling list.</p>'}
       <div class="actions">
@@ -309,11 +309,12 @@ function saleEstimates(animals, all, date) {
     const price = expectedPricePerKg(a, all);
     const weight = exp.value !== null ? projectedWeight(a, exp.value, date) : latestWeight(a).kg;
     const value = price !== null ? weight * price : null;
-    return { a, weight, price, value, margin: value !== null ? value - a.cost : null };
+    return { a, dob: a.dob, weight, price, value, margin: value !== null ? value - a.cost : null };
   });
 }
 
 const ESTIMATE_FIGURES = [
+  { key: 'dob', label: 'Born' },
   { key: 'weight', label: 'Est. weight', num: true },
   { key: 'price', label: 'Est. €/kg', num: true },
   { key: 'value', label: 'Est. value', num: true },
@@ -335,6 +336,7 @@ function estimateTable(table, rows, action) {
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
+            <td data-label="Born">${fmtDate(a.dob)}</td>
             <td class="num" data-label="Est. weight">${fmtKg(weight)}</td>
             <td class="num" data-label="Est. €/kg">${fmtPrice(price)}</td>
             <td class="num" data-label="Est. value">${fmtMoney(value)}</td>
