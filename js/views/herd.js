@@ -384,6 +384,7 @@ function restRows(rest, all, date) {
 
 const SOLD_FIGURES = [
   { key: 'date', label: 'Sold' },
+  { key: 'age', label: 'Age at sale', num: true },
   { key: 'days', label: 'Days on farm', num: true },
   { key: 'gain', label: 'Gain', num: true },
   { key: 'weight', label: 'Weight', num: true },
@@ -409,7 +410,7 @@ function soldList(sold) {
       .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
       .map((a) => {
         const s = saleStats(a);
-        return { a, date: a.sale.date, days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
+        return { a, date: a.sale.date, age: daysBetween(a.dob, a.sale.date), days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
       }),
     sorts.sold,
   );
@@ -423,11 +424,12 @@ function soldList(sold) {
         ${sortHeads('sold', [TAG_COLUMN])}<th>Breed</th>${sortHeads('sold', SOLD_FIGURES)}
       </tr></thead>
       <tbody>
-        ${shown.map(({ a, date, days, gain, weight, gained, price, pricePerKg, profit }) => `
+        ${shown.map(({ a, date, age, days, gain, weight, gained, price, pricePerKg, profit }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
             <td data-label="Sold">${fmtDate(date)}</td>
+            <td class="num" data-label="Age at sale">${fmtAge(monthsBetween(a.dob, date))} <span class="muted">(${fmtInt(age)} days)</span></td>
             <td class="num" data-label="Days on farm">${fmtInt(days)}</td>
             <td class="num" data-label="Gain">${fmtAdg(gain)}</td>
             <td class="num" data-label="Weight">${fmtKg(weight)}</td>
