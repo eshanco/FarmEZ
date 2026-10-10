@@ -391,6 +391,7 @@ const SOLD_FIGURES = [
   { key: 'gained', label: 'Weight gain', num: true },
   { key: 'price', label: 'Price', num: true },
   { key: 'pricePerKg', label: '€/kg', num: true },
+  { key: 'perKgChange', label: '€/kg change', num: true },
   { key: 'profit', label: 'Profit', num: true },
 ];
 
@@ -410,7 +411,9 @@ function soldList(sold) {
       .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
       .map((a) => {
         const s = saleStats(a);
-        return { a, date: a.sale.date, age: daysBetween(a.dob, a.sale.date), days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, profit: s.profit };
+        // Sale €/kg less the €/kg paid for the animal.
+        const perKgChange = s.pricePerKg !== null && a.purchaseWeight > 0 ? s.pricePerKg - a.cost / a.purchaseWeight : null;
+        return { a, date: a.sale.date, age: daysBetween(a.dob, a.sale.date), days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, perKgChange, profit: s.profit };
       }),
     sorts.sold,
   );
@@ -424,7 +427,7 @@ function soldList(sold) {
         ${sortHeads('sold', [TAG_COLUMN])}<th>Breed</th>${sortHeads('sold', SOLD_FIGURES)}
       </tr></thead>
       <tbody>
-        ${shown.map(({ a, date, age, days, gain, weight, gained, price, pricePerKg, profit }) => `
+        ${shown.map(({ a, date, age, days, gain, weight, gained, price, pricePerKg, perKgChange, profit }) => `
           <tr>
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
@@ -436,6 +439,7 @@ function soldList(sold) {
             <td class="num" data-label="Weight gain">${fmtKg(gained)}</td>
             <td class="num" data-label="Price">${fmtMoney(price)}</td>
             <td class="num" data-label="€/kg">${fmtPrice(pricePerKg)}</td>
+            <td class="num ${perKgChange === null ? '' : perKgChange < 0 ? 'neg' : 'pos'}" data-label="€/kg change">${perKgChange > 0 ? '+' : ''}${fmtPrice(perKgChange)}</td>
             <td class="num ${profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(profit)}</td>
           </tr>`).join('')}
       </tbody>
