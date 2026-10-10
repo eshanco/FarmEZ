@@ -4,8 +4,9 @@ import {
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
 import {
-  esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
+  downloadFile, esc, fmtAdg, fmtAge, fmtDate, fmtInt, fmtKg, fmtMoney, fmtPrice, positive, reportWrite, showError, todayISO,
 } from '../util.js';
+import { buildXlsx } from '../xlsx.js';
 
 let tab = 'farm';
 let query = '';
@@ -137,6 +138,7 @@ export function renderHerd(el, { state }) {
         draw();
       }),
     );
+    list.querySelector('#export-sold')?.addEventListener('click', () => exportSold(sold));
   };
   draw();
 
@@ -395,26 +397,76 @@ const SOLD_FIGURES = [
   { key: 'profit', label: 'Profit', num: true },
 ];
 
+const soldIn = (a) => a.sale.date.slice(0, 4);
+// Years with a sale in them, newest first.
+const saleYears = (sold) => [...new Set(sold.map(soldIn))].sort().reverse();
+
+// The figures of a sold animal, keyed as in SOLD_FIGURES.
+function soldRow(a) {
+  const s = saleStats(a);
+  // Sale €/kg less the €/kg paid for the animal.
+  const perKgChange = s.pricePerKg !== null && a.purchaseWeight > 0 ? s.pricePerKg - a.cost / a.purchaseWeight : null;
+  return { a, date: a.sale.date, age: daysBetween(a.dob, a.sale.date), days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, perKgChange, profit: s.profit, profitPerDay: s.profitPerDay };
+}
+
+// Columns of the Excel export: everything recorded for the animal, then the sale and its figures.
+// `value` takes a soldRow.
+const EXPORT_COLUMNS = [
+  { label: 'Tag', type: 'text', width: 18, value: (r) => r.a.tag },
+  { label: 'Breed', type: 'text', value: (r) => r.a.breed },
+  { label: 'Breed name', type: 'text', width: 24, value: (r) => breedName(r.a.breed) },
+  { label: 'Dam breed', type: 'text', value: (r) => r.a.damBreed },
+  { label: 'Dam breed name', type: 'text', width: 24, value: (r) => breedName(r.a.damBreed) },
+  { label: 'Date of birth', type: 'date', value: (r) => r.a.dob },
+  { label: 'Purchase date', type: 'date', value: (r) => r.a.purchaseDate },
+  { label: 'Age at purchase (days)', type: 'int', value: (r) => daysBetween(r.a.dob, r.a.purchaseDate) },
+  { label: 'Purchase weight (kg)', type: 'decimal', value: (r) => r.a.purchaseWeight },
+  { label: 'Cost (€)', type: 'money', value: (r) => r.a.cost },
+  { label: 'Cost €/kg', type: 'money', value: (r) => (r.a.purchaseWeight > 0 ? r.a.cost / r.a.purchaseWeight : null) },
+  { label: 'Location', type: 'text', width: 18, value: (r) => r.a.location },
+  { label: 'Wintered', type: 'text', value: (r) => (r.a.wintered ? 'Yes' : 'No') },
+  { label: 'Sale date', type: 'date', value: (r) => r.date },
+  { label: 'Age at sale (days)', type: 'int', value: (r) => r.age },
+  { label: 'Days on farm', type: 'int', value: (r) => r.days },
+  { label: 'Sale weight (kg)', type: 'decimal', value: (r) => r.weight },
+  { label: 'Weight gain (kg)', type: 'decimal', value: (r) => r.gained },
+  { label: 'Gain (kg/day)', type: 'decimal', value: (r) => r.gain },
+  { label: 'Sale price (€)', type: 'money', value: (r) => r.price },
+  { label: 'Sale €/kg', type: 'money', value: (r) => r.pricePerKg },
+  { label: '€/kg change', type: 'money', value: (r) => r.perKgChange },
+  { label: 'Profit (€)', type: 'money', value: (r) => r.profit },
+  { label: 'Profit per day (€)', type: 'money', value: (r) => r.profitPerDay },
+];
+
+// Downloads every sold animal as a workbook: an All sheet, then one sheet per sale year. The
+// search box and the year picked on screen do not narrow it.
+function exportSold(sold) {
+  const rows = sortRows(sold.map(soldRow), { key: 'tag', dir: 'asc' }).sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0));
+  const sheet = (name, list) => ({ name, columns: EXPORT_COLUMNS, rows: list.map((r) => EXPORT_COLUMNS.map((c) => c.value(r))) });
+  const sheets = [
+    sheet('All', rows),
+    ...saleYears(sold).map((year) => sheet(year, rows.filter((r) => soldIn(r.a) === year))),
+  ];
+  downloadFile(
+    `farmez-sold-${todayISO()}.xlsx`,
+    buildXlsx(sheets),
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+}
+
 function soldList(sold) {
   if (!sold.length) return `<p class="empty">No sales recorded yet. Open an animal to record its sale.</p>`;
-  const soldIn = (a) => a.sale.date.slice(0, 4);
-  const years = [...new Set(sold.map(soldIn))].sort().reverse();
+  const years = saleYears(sold);
   if (!years.includes(soldYear)) soldYear = 'all';
   const yearTabs = `
     <div class="toolbar">
       <div class="tabs">
         ${['all', ...years].map((y) => `<button type="button" data-sold-year="${y}" aria-pressed="${y === soldYear}">${y === 'all' ? 'All' : y}</button>`).join('')}
       </div>
+      <button class="btn" type="button" id="export-sold">Export to Excel</button>
     </div>`;
   const shown = sortRows(
-    sold
-      .filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a))
-      .map((a) => {
-        const s = saleStats(a);
-        // Sale €/kg less the €/kg paid for the animal.
-        const perKgChange = s.pricePerKg !== null && a.purchaseWeight > 0 ? s.pricePerKg - a.cost / a.purchaseWeight : null;
-        return { a, date: a.sale.date, age: daysBetween(a.dob, a.sale.date), days: s.days, gain: adg(a), weight: a.sale.weight, gained: s.gain, price: a.sale.price, pricePerKg: s.pricePerKg, perKgChange, profit: s.profit };
-      }),
+    sold.filter((a) => (soldYear === 'all' || soldIn(a) === soldYear) && matches(a)).map(soldRow),
     sorts.sold,
   );
   if (!shown.length) return `${yearTabs}<p class="empty">No animals match “${esc(query)}”.</p>`;

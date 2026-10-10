@@ -5,6 +5,7 @@ A small web app for tracking cattle from purchase to sale.
 - Record each animal at purchase: tag number, date of birth, breed, dam breed, purchase date, weight and cost. Breeds are entered as the code on the cattle card, e.g. `AA` for Aberdeen Angus and `AAX` for an Aberdeen Angus cross.
 - Line up the animals you are selling this week on the Selling tab, with estimated weight, value and margin for the sale date.
 - Record the sale date, weight and price when it goes. On sale day, enter the sale weight and type bids as they rise to see the €/kg you are getting.
+- Export the sold animals to Excel from the Sold tab: one sheet with every sale, then a sheet for each sale year.
 - See average daily weight gain, a projected weight and an estimated sale price for every animal still on the farm.
 - Compare breeds and dam breeds on gain, price per kg and profit.
 - Price calculator: enter a weight and see what it is worth from €3.00 to €7.00 per kg.

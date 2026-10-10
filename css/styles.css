@@ -421,6 +421,7 @@ th[aria-sort="ascending"] button::after { content: " ▴"; }
   .form-grid { grid-template-columns: 1fr 1fr; max-width: 720px; }
   .inline-form { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .toolbar { grid-template-columns: auto minmax(200px, 320px); justify-content: space-between; }
+  .toolbar > .btn { justify-self: end; }
   .tabs button { padding: 0 20px; }
   .facts { grid-template-columns: repeat(3, 1fr); }
   .two-col { grid-template-columns: 1fr 1fr; gap: 32px; }

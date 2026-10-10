@@ -47,6 +47,19 @@ export function showError(form, message) {
   el.hidden = !message;
 }
 
+// Saves bytes to the device as a file with the given name.
+export function downloadFile(name, bytes, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoked after a pause: some browsers start the download a moment after the click.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 // Surfaces a failed database write (see db.js for why writes are not awaited).
 export function reportWrite(done) {
   done.catch((err) => toast(`Could not save: ${err?.code ?? err?.message ?? 'unknown error'}`));
