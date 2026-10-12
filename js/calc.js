@@ -99,6 +99,27 @@ export function expectedPricePerKg(animal, animals) {
   return animal.estPrice > 0 ? animal.estPrice : recentPricePerKg(animals);
 }
 
+// Gain rate, weight, €/kg, value and margin an unsold animal is estimated at if it were sold on `date`.
+// Without a gain rate the weight is its last known one; without a €/kg there is no value.
+export function saleEstimate(animal, animals, date) {
+  const exp = expectedAdg(animal, animals);
+  const price = expectedPricePerKg(animal, animals);
+  const weight = exp.value !== null ? projectedWeight(animal, exp.value, date) : latestWeight(animal).kg;
+  const value = price !== null ? weight * price : null;
+  return { adg: exp.value, weight, price, value, margin: value !== null ? value - animal.cost : null };
+}
+
+// The estimate a sold animal had going into its sale: { adg, weight, price, value, saved }. Sales
+// recorded before estimates were kept have none saved, so theirs is worked out again as it
+// stood on the sale date, from the animal's own figures and the sales before that day.
+export function estimateAtSale(animal, animals) {
+  if (!animal.sale) return null;
+  if (animal.sale.estimate) return { ...animal.sale.estimate, saved: true };
+  const earlier = animals.filter((a) => a.id !== animal.id && a.sale && a.sale.date < animal.sale.date);
+  const { margin, ...estimate } = saleEstimate({ ...animal, sale: null }, earlier, animal.sale.date);
+  return { ...estimate, saved: false };
+}
+
 // Rows of { pricePerKg, total } for a weight. Worked in cents so 0.20 steps do not drift.
 export function priceTable(kg, { from = 3, to = 7, step = 0.2 } = {}) {
   const start = Math.round(from * 100);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   adg,
   daysBetween,
+  estimateAtSale,
   expectedAdg,
   expectedPricePerKg,
   groupStats,
@@ -11,6 +12,7 @@ import {
   priceTable,
   projectedWeight,
   recentPricePerKg,
+  saleEstimate,
   saleStats,
 } from '../js/calc.js';
 
@@ -91,6 +93,30 @@ test('projectedWeight grows from the last known weight', () => {
   const a = animal({ weighIns: [{ date: '2026-03-01', kg: 360 }] });
   assert.equal(projectedWeight(a, 1, '2026-03-31'), 390);
   assert.equal(projectedWeight(a, 1, '2026-02-01'), 360); // never projects backwards
+});
+
+test('saleEstimate projects weight and values it at the expected price', () => {
+  const a = animal({ estAdg: 1, estPrice: 4 });
+  assert.deepEqual(saleEstimate(a, [], '2026-04-11'), { adg: 1, weight: 400, price: 4, value: 1600, margin: 400 });
+  // No gain rate: last known weight. No price: no value.
+  assert.deepEqual(saleEstimate(animal(), [], '2026-04-11'), { adg: null, weight: 300, price: null, value: null, margin: null });
+});
+
+test('estimateAtSale uses the saved estimate, else works it out from earlier sales', () => {
+  assert.equal(estimateAtSale(animal(), []), null);
+
+  const estimate = { weight: 410, price: 4.2, value: 1722 };
+  const kept = animal({ sale: { date: '2026-04-11', weight: 400, price: 1800, estimate } });
+  assert.deepEqual(estimateAtSale(kept, []), { ...estimate, saved: true });
+
+  const sold = animal({ sale: { date: '2026-04-11', weight: 400, price: 1800 } });
+  const herd = [
+    sold,
+    animal({ id: 's1', sale: { date: '2026-03-02', weight: 360, price: 1440 } }), // 1 kg/day, €4/kg
+    animal({ id: 's2', sale: { date: '2026-04-11', weight: 500, price: 3000 } }), // same day: ignored
+    animal({ id: 's3', sale: { date: '2026-05-01', weight: 500, price: 3000 } }), // later: ignored
+  ];
+  assert.deepEqual(estimateAtSale(sold, herd), { adg: 1, weight: 400, price: 4, value: 1600, saved: false });
 });
 
 test('priceTable runs 3.00 to 7.00 in 0.20 steps', () => {

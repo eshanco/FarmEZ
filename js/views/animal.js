@@ -1,5 +1,6 @@
 import {
-  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleStats,
+  adg, daysBetween, estimateAtSale, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight,
+  saleEstimate, saleStats,
 } from '../calc.js';
 import { breedName } from '../breeds.js';
 import { deleteAnimal, updateAnimal } from '../db.js';
@@ -67,7 +68,7 @@ export function renderAnimal(el, { state, arg }) {
       </dl>
     </section>
 
-    ${sold ? saleResult(animal) : onFarmSections(animal, last, today)}
+    ${sold ? saleResult(animal, state.animals) : onFarmSections(animal, last, today)}
 
     ${!WEIGH_INS_ENABLED ? '' : `
     <section class="card">
@@ -159,7 +160,11 @@ export function renderAnimal(el, { state, arg }) {
     else if (f.date > today) error = 'Sale date cannot be in the future.';
     showError(saleForm, error);
     if (error) return;
-    write({ sale: { date: f.date, weight, price }, sellingDate: null });
+    // The estimate as it stands on the page, counting figures typed too recently to have saved,
+    // is kept with the sale so the two can be compared afterwards.
+    const typed = { ...animal, estAdg: positive(est.adg) ?? animal.estAdg, estPrice: positive(est.price) ?? animal.estPrice };
+    const { margin, ...estimate } = saleEstimate(typed, state.animals, f.date);
+    write({ sale: { date: f.date, weight, price, estimate }, sellingDate: null });
   });
 
   if (!sold) {
@@ -297,8 +302,25 @@ function wireEstimate(el, animal, animals, uid, today) {
   update();
 }
 
-function saleResult(animal) {
+// The difference between what happened and what was estimated, e.g. "(+€120)".
+function delta(actual, estimate, fmt) {
+  if (actual == null || estimate == null) return '';
+  const diff = actual - estimate;
+  return ` (${diff > 0 ? '+' : ''}${fmt(diff)})`;
+}
+
+const fixed2 = (n) => n.toFixed(2);
+
+// The same, coloured by whether the sale beat the estimate.
+function deltaHtml(actual, estimate, fmt) {
+  const text = delta(actual, estimate, fmt);
+  return text && ` <b class="${actual < estimate ? 'neg' : 'pos'}">${text.trim()}</b>`;
+}
+
+function saleResult(animal, animals) {
   const s = saleStats(animal);
+  const e = estimateAtSale(animal, animals);
+  const margin = e.value != null ? e.value - animal.cost : null;
   return `
     <section class="card">
       <div class="card-head">
@@ -310,6 +332,29 @@ function saleResult(animal) {
         <div class="tile"><span>Sale weight</span><strong>${fmtKg(animal.sale.weight)}</strong><small>${fmtPrice(s.pricePerKg)}/kg</small></div>
         <div class="tile"><span>Profit</span><strong class="${s.profit < 0 ? 'neg' : 'pos'}">${fmtMoney(s.profit)}</strong><small>${fmtPrice(s.profitPerDay)}/day</small></div>
         <div class="tile"><span>Gain</span><strong>${fmtAdg(s.adg)}</strong><small>${fmtKg(s.gain)} in ${fmtInt(s.days)} days</small></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Sale estimate</h2>
+      <div class="inline-form">
+        <div class="field">Sale date
+          <div class="readout">${fmtDate(animal.sale.date)}</div>
+        </div>
+        <div class="field">Gain (kg/day)
+          <div class="readout">${e.adg == null ? '' : `${e.adg.toFixed(2)}${deltaHtml(s.adg, e.adg, fixed2)}`}</div>
+        </div>
+        <div class="field">Price (€/kg)
+          <div class="readout">${e.price == null ? '' : `${e.price.toFixed(2)}${deltaHtml(s.pricePerKg, e.price, fixed2)}`}</div>
+        </div>
+      </div>
+      <div id="est-out">
+        <div class="tiles">
+          <div class="tile"><span>Projected weight</span><strong>${fmtKg(e.weight)}${deltaHtml(animal.sale.weight, e.weight, fmtKg)}</strong><small>${fmtDate(animal.sale.date)}</small></div>
+          <div class="tile"><span>Estimated sale price</span><strong>${fmtMoney(e.value)}${deltaHtml(animal.sale.price, e.value, fmtMoney)}</strong></div>
+          <div class="tile"><span>Estimated margin</span><strong>${fmtMoney(margin)}${deltaHtml(s.profit, margin, fmtMoney)}</strong><small>over cost</small></div>
+        </div>
+        <p class="hint">Figures in brackets are what the sale came to over or under the estimate.${e.saved ? '' : ' No estimate was kept when this sale was recorded, so this one is worked out from the animal\'s figures and the sales before it.'}</p>
       </div>
     </section>`;
 }

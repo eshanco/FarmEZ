@@ -1,5 +1,5 @@
 import {
-  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleStats,
+  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleEstimate, saleStats,
 } from '../calc.js';
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
@@ -306,13 +306,7 @@ function renderSelling(list, state, onFarm, selling) {
 
 // Weight, value and margin of each animal if it were sold on `date`.
 function saleEstimates(animals, all, date) {
-  return animals.map((a) => {
-    const exp = expectedAdg(a, all);
-    const price = expectedPricePerKg(a, all);
-    const weight = exp.value !== null ? projectedWeight(a, exp.value, date) : latestWeight(a).kg;
-    const value = price !== null ? weight * price : null;
-    return { a, dob: a.dob, weight, price, value, margin: value !== null ? value - a.cost : null };
-  });
+  return animals.map((a) => ({ a, dob: a.dob, ...saleEstimate(a, all, date) }));
 }
 
 const ESTIMATE_FIGURES = [

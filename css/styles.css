@@ -196,7 +196,7 @@ label, .field {
 }
 
 /* 16px inputs stop iOS zooming the page on focus. */
-input, select {
+input, select, .readout {
   width: 100%;
   min-height: 44px;
   padding: 8px 10px;
@@ -211,6 +211,8 @@ input, select {
 
 .form-grid, .inline-form, .login form { display: grid; gap: 12px; }
 .form-grid .actions, .form-grid .form-error { grid-column: 1 / -1; }
+/* A figure shown in the shape of a field, where there is nothing to type. */
+.readout { display: flex; align-items: center; gap: 0.35em; font-weight: 400; }
 .inline-form .form-error { grid-column: 1 / -1; }
 .inline-form .btn { align-self: end; }
 .inline-form + #est-out, table + .inline-form { margin-top: 16px; }
