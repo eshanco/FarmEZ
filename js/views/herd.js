@@ -1,5 +1,5 @@
 import {
-  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, monthsBetween, projectedWeight, saleEstimate, saleStats,
+  adg, daysBetween, expectedAdg, expectedPricePerKg, latestWeight, mean, monthsBetween, projectedWeight, saleEstimate, saleStats,
 } from '../calc.js';
 import { breedName, breedOptions, toBreedCode } from '../breeds.js';
 import { addAnimal, updateAnimal } from '../db.js';
@@ -15,6 +15,8 @@ let sellDate = '';
 let sellDateTimer;
 // Sale year the Sold tab is limited to, or 'all'. Insights groups by purchase year instead.
 let soldYear = 'all';
+// Ids of sold animals unticked from the Sold averages this session.
+const leftOut = new Set();
 // Column and direction each table is sorted by. Tag order to begin with; Sold starts newest first.
 const sorts = {
   farm: { key: 'tag', dir: 'asc' },
@@ -139,6 +141,13 @@ export function renderHerd(el, { state }) {
       }),
     );
     list.querySelector('#export-sold')?.addEventListener('click', () => exportSold(sold));
+    list.querySelectorAll('[data-average]').forEach((box) =>
+      box.addEventListener('change', () => {
+        if (box.checked) leftOut.delete(box.dataset.average);
+        else leftOut.add(box.dataset.average);
+        draw();
+      }),
+    );
   };
   draw();
 
@@ -448,6 +457,32 @@ function exportSold(sold) {
   );
 }
 
+// Average of each figure over the rows shown and ticked, as the top row of the Sold table. Blanks
+// are left out.
+function soldAverages(shown) {
+  const rows = shown.filter((r) => !leftOut.has(r.a.id));
+  const avg = (key) => mean(rows.map((r) => r[key]));
+  const age = avg('age');
+  const perKgChange = avg('perKgChange');
+  const profit = avg('profit');
+  return `
+    <tr class="averages">
+      <td class="title">Average <span class="muted">(${rows.length === shown.length ? rows.length : `${rows.length} of ${shown.length}`})</span></td>
+      <td class="blank"></td>
+      <td class="blank"></td>
+      <td class="num" data-label="Age at sale">${age === null ? '–' : `${fmtAge(Math.floor(age / (365.25 / 12)))} <span class="muted">(${fmtInt(age)} days)</span>`}</td>
+      <td class="num" data-label="Days on farm">${fmtInt(avg('days'))}</td>
+      <td class="num" data-label="Gain">${fmtAdg(avg('gain'))}</td>
+      <td class="num" data-label="Weight">${fmtKg(avg('weight'))}</td>
+      <td class="num" data-label="Weight gain">${fmtKg(avg('gained'))}</td>
+      <td class="num" data-label="Price">${fmtMoney(avg('price'))}</td>
+      <td class="num" data-label="€/kg">${fmtPrice(avg('pricePerKg'))}</td>
+      <td class="num ${perKgChange === null ? '' : perKgChange < 0 ? 'neg' : 'pos'}" data-label="€/kg change">${perKgChange > 0 ? '+' : ''}${fmtPrice(perKgChange)}</td>
+      <td class="num ${profit === null ? '' : profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(profit)}</td>
+      <td class="blank"></td>
+    </tr>`;
+}
+
 function soldList(sold) {
   if (!sold.length) return `<p class="empty">No sales recorded yet. Open an animal to record its sale.</p>`;
   const years = saleYears(sold);
@@ -470,11 +505,12 @@ function soldList(sold) {
     ${sortSelect('sold', [TAG_COLUMN, ...SOLD_FIGURES])}
     <table class="cards">
       <thead><tr>
-        ${sortHeads('sold', [TAG_COLUMN])}<th>Breed</th>${sortHeads('sold', SOLD_FIGURES)}
+        ${sortHeads('sold', [TAG_COLUMN])}<th>Breed</th>${sortHeads('sold', SOLD_FIGURES)}<th class="num">In average</th>
       </tr></thead>
       <tbody>
+        ${soldAverages(shown)}
         ${shown.map(({ a, date, age, days, gain, weight, gained, price, pricePerKg, perKgChange, profit }) => `
-          <tr>
+          <tr class="${leftOut.has(a.id) ? 'left-out' : ''}">
             <td class="title"><a class="row-link" href="#animal/${esc(a.id)}">${esc(a.tag)}</a></td>
             <td data-label="Breed">${esc(breedLabel(a))}</td>
             <td data-label="Sold">${fmtDate(date)}</td>
@@ -487,6 +523,7 @@ function soldList(sold) {
             <td class="num" data-label="€/kg">${fmtPrice(pricePerKg)}</td>
             <td class="num ${perKgChange === null ? '' : perKgChange < 0 ? 'neg' : 'pos'}" data-label="€/kg change">${perKgChange > 0 ? '+' : ''}${fmtPrice(perKgChange)}</td>
             <td class="num ${profit < 0 ? 'neg' : 'pos'}" data-label="Profit">${fmtMoney(profit)}</td>
+            <td class="num row-action" data-label="In average"><input type="checkbox" class="average-box" data-average="${esc(a.id)}" ${leftOut.has(a.id) ? '' : 'checked'} aria-label="Include ${esc(a.tag)} in the average"></td>
           </tr>`).join('')}
       </tbody>
     </table>`;

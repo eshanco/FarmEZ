@@ -305,6 +305,11 @@ th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--bor
 th { font-size: 0.8rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 th.num, td.num { text-align: right; }
 tbody tr:last-child td { border-bottom: 0; }
+/* Averages row at the top of the Sold table. */
+tr.averages td { font-weight: 600; background: var(--accent-soft); }
+/* A sold animal unticked from the averages. */
+tr.left-out td:not(.row-action) { opacity: 0.5; }
+input.average-box { width: 22px; height: 22px; min-height: 0; padding: 0; margin: 0; accent-color: var(--accent); vertical-align: middle; }
 
 th button {
   background: none;
@@ -355,12 +360,16 @@ th[aria-sort="ascending"] button::after { content: " ▴"; }
   table.cards td::before { content: attr(data-label); color: var(--muted); text-align: left; }
   table.cards td.title { font-size: 1.1rem; font-weight: 700; padding-bottom: 6px; text-align: left; }
   table.cards td.title::before { content: none; }
+  table.cards td.blank { display: none; }
+  table.cards tr.averages { background: var(--accent-soft); }
+  table.cards tr.averages td { background: none; }
   /* Whole card is the tap target. */
   table.cards .row-link { text-decoration: none; }
   table.cards .row-link::after { content: ""; position: absolute; inset: 0; }
   /* Buttons inside a card stay clickable above the card-wide link. */
   table.cards td.row-action { justify-content: flex-end; padding-top: 8px; }
-  table.cards td.row-action .btn { position: relative; z-index: 1; }
+  table.cards td.row-action[data-label] { justify-content: space-between; align-items: center; }
+  table.cards td.row-action .btn, table.cards td.row-action .average-box { position: relative; z-index: 1; }
   .tabs button { font-size: 0.9rem; }
 }
 
@@ -440,6 +449,7 @@ th[aria-sort="ascending"] button::after { content: " ▴"; }
   .card table.cards { border: 0; }
   table.cards th, table.cards td { padding: 12px; }
   table.cards tbody tr:hover td { background: var(--accent-soft); }
+  table.cards tr.averages td { border-bottom: 2px solid var(--border); }
   table.cards td.title { font-weight: 700; }
 
   #toast { left: auto; right: 24px; bottom: 24px; max-width: 360px; }

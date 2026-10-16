@@ -25,7 +25,7 @@ function norm(s) {
   return (s ?? '').trim().toLowerCase();
 }
 
-function mean(values) {
+export function mean(values) {
   const nums = values.filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 }
